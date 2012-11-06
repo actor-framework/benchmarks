@@ -1,2 +1,2 @@
 #!/bin/bash
-echo "../build/bin/$@" | ./exec.sh
+echo "cppa/build/bin/$@" | ./exec.sh
