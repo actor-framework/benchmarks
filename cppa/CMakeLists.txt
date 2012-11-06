@@ -65,3 +65,22 @@ add_benchmark(mixed_case)
 add_benchmark(distributed)
 add_benchmark(matching)
 
+# done (print summary)
+message("\n====================|  Build Summary  |===================="
+        "\n"
+        "\nBuild type:        ${CMAKE_BUILD_TYPE}"
+        "\n"
+        "\nCXX:               ${CMAKE_CXX_COMPILER}"
+        "\nCXXFLAGS:          ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${build_type}}"
+        "\nLD_DIRS:           ${LD_DIRS}"
+        "\nLIBRARIES:         ${LD_FLAGS}"
+        "\n"
+        "\nSource directory:  ${CMAKE_SOURCE_DIR}"
+        "\nBuild directory:   ${CMAKE_BINARY_DIR}"
+        "\nExecutable path:   ${EXECUTABLE_OUTPUT_PATH}"
+        "\nLibrary path:      ${LIBRARY_OUTPUT_PATH}"
+        "\nInstall prefix:    ${CMAKE_INSTALL_PREFIX}"
+        "\n"
+        "\nBoost:             ${Boost_INCLUDE_DIR}"
+        "\n"
+        "\n===========================================================\n")
