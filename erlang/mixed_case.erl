@@ -1,5 +1,5 @@
 -module(mixed_case).
--export([start/1, master/1, worker/1, chain_link/1]).
+-export([start/1, master/1, worker/1, chain_link/1, factorize/1]).
 
 %next_factor(N, M) when N rem M =:= 0 -> M;
 %next_factor(N, M) -> next_factor(N, M+1).
@@ -12,7 +12,7 @@
 %factorize(1) -> [];
 %factorize(N) -> factorize(N,2).
 
-factorize(N,M,R) when N < M*M -> lists:reverse([M|R]);
+factorize(N,M,R) when N =:= M -> [M|R];
 factorize(N,M,R) when (N rem M) =:= 0 -> factorize(N div M, M, [M|R]);
 factorize(N,2,R) -> factorize(N,3,R);
 factorize(N,M,R) -> factorize(N,M+2,R).
