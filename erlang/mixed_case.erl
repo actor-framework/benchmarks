@@ -12,8 +12,8 @@
 %factorize(1) -> [];
 %factorize(N) -> factorize(N,2).
 
-factorize(N,M,R) when N =:= M -> R ++ [M];
-factorize(N,M,R) when (N rem M) =:= 0 -> factorize(N div M, M, R ++ [M]);
+factorize(N,M,R) when N < M*M -> lists:reverse([M|R]);
+factorize(N,M,R) when (N rem M) =:= 0 -> factorize(N div M, M, [M|R]);
 factorize(N,2,R) -> factorize(N,3,R);
 factorize(N,M,R) -> factorize(N,M+2,R).
 
