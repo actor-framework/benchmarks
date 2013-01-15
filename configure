@@ -6,8 +6,7 @@
 type cmake > /dev/null 2>&1 || {
     echo "\
 This package requires CMake, please install it first, then you may
-use this configure script to access CMake equivalent functionality.\
-" >&2;
+use this configure script to access CMake equivalent functionality." >&2;
     exit 1;
 }
 
@@ -17,27 +16,21 @@ usage="\
 Usage: $0 [OPTION]... [VAR=VALUE]...
 
   Build Options:
-    --generator=GENERATOR       CMake generator to use (see cmake --help)
-    --build-type=DIR            CMake build type: [RelWithDebInfo]
-                                  - Debug: debugging flags enabled
-                                  - MinSizeRel: minimal output size
-                                  - Release: optimizations on, debugging off
-                                  - RelWithDebInfo: release flags plus debugging
-    --build-dir=DIR             place build files in directory [build]
-    --bin-dir=DIR               executable directory [build/bin]
-    --lib-dir=DIR               library directory [build/lib]
-    --with-clang=FILE           path to clang++ executable
-    --with-gcc=FILE             path to g++ executable
-    --dual-build                build both with gcc and clang
+    --no-cppa                   exclude benchmarks for libcppa
+    --no-scala                  exclude benchmarks for Scala
+    --no-erlang                 exclude benchmarks for Erlang
+    --no-theron                 exclude benchmarks for Theron
 
-  Installation Directories:
-    --prefix=PREFIX             installation directory [/usr/local]
-
-  Optional Features:
-    --enable-perftools          use Google perftools
+  Compiler Options:
+    --with-clang=PATH           path to clang++ executable
+    --with-gcc=PATH             path to g++ executable
+    --with-scalac=PATH          path to scala compiler
+    --with-erlc=PATH            path to erlang compiler
 
   Required Packages in Non-Standard Locations:
+    --with-libcppa=PATH         path to libcppa install root
     --with-boost=PATH           path to Boost install root
+    --with-theron=PATH          path to Theron install root
 
   Influential Environment Variables (only on first invocation
   per build directory):
@@ -79,7 +72,7 @@ configure ()
     if [ -n "$3" ]; then
         append_cache_entry EXECUTABLE_OUTPUT_PATH PATH $3
     else
-        append_cache_entry EXECUTABLE_OUTPUT_PATH PATH "$workdir/bin"
+        append_cache_entry EXECUTABLE_OUTPUT_PATH PATH "/bin"
     fi
 
     if [ -d $workdir ]; then
@@ -107,6 +100,7 @@ configure ()
 }
 
 # Set defaults.
+ExcludedBenchmarks=""
 builddir="$sourcedir/build"
 CMakeCacheEntries=""
 append_cache_entry CMAKE_BUILD_TYPE            STRING RelWithDebInfo
@@ -124,12 +118,6 @@ while [ $# -ne 0 ]; do
             echo "${usage}" 1>&2
             exit 1
             ;;
-        --generator=*)
-            CMakeGenerator="$optarg"
-            ;;
-        --prefix=*)
-            append_cache_entry CMAKE_INSTALL_PREFIX PATH $optarg
-            ;;
         --with-boost=*)
             append_cache_entry BOOST_ROOT PATH $optarg
             ;;
@@ -139,20 +127,17 @@ while [ $# -ne 0 ]; do
         --with-gcc=*)
             gcc=$optarg
             ;;
-        --build-type=*)
-            append_cache_entry CMAKE_BUILD_TYPE STRING $optarg
+        --no-cppa)
+            ExcludedBenchmarks="cppa_$ExcludedBenchmarks"
             ;;
-        --build-dir=*)
-            builddir=$optarg
+        --no-theron)
+            ExcludedBenchmarks="theron_$ExcludedBenchmarks"
             ;;
-        --bin-dir=*)
-            bindir=$optarg
+        --no-scala)
+            ExcludedBenchmarks="scala_$ExcludedBenchmarks"
             ;;
-        --lib-dir=*)
-            libdir=$optarg
-            ;;
-        --dual-build)
-            dualbuild=1
+        --no-erlang)
+            ExcludedBenchmarks="erlang_$ExcludedBenchmarks"
             ;;
         *)
             echo "Invalid option '$1'.  Try $0 --help to see available options."
@@ -162,58 +147,30 @@ while [ $# -ne 0 ]; do
     shift
 done
 
+append_cache_entry DISABLED_BENCHMARKS STRING "$ExcludedBenchmarks"
+
 # At this point we save the global CMake variables so that configure() can
 # later use them.
 CMakeDefaultCache=$CMakeCacheEntries
 
-if [ -n "$dualbuild" ]; then
-    # Use what we got in $PATH if --with-clang or --with-gcc is not specified.
-    if [ -z "$clang" ]; then
-        clang=clang++
-    fi
-    if [ -z "$gcc" ]; then
-        gcc=g++
-    fi
-
-    for i in gcc clang; do
-        compiler="$(eval echo \$$i)"
-        configure $compiler $i "" "" $CMakeGenerator
-    done
-else
-    # Prefer Clang to GCC.
-    if [ -n "$clang" ]; then
-        compiler=$clang
-    elif [ -n "$gcc" ]; then
-        compiler=$gcc
-    fi
-
-    configure $compiler "" $bindir $libdir $CMakeGenerator
+# Prefer Clang to GCC.
+if [ -n "$clang" ]; then
+    compiler=$clang
+elif [ -n "$gcc" ]; then
+    compiler=$gcc
 fi
+
+configure $compiler "" $bindir $libdir $CMakeGenerator
 
 printf "DIRS := %s\n\n" "$workdirs" > $sourcedir/Makefile
 makefile=$(cat <<'EOT'
 all:
-	@for i in $(DIRS); do $(MAKE) -C $$i $@ || exit; done
-
-test:
-	@for i in $(DIRS); do $(MAKE) -C $$i $@ || exit; done
-
-install:
-	@for i in $(DIRS); do $(MAKE) -C $$i $@ || exit; done
-
-uninstall:
-	@for i in $(DIRS); do $(MAKE) -C $$i $@ || exit; done
+	$(MAKE) -C build $@ || exit
 
 clean:
-	@for i in $(DIRS); do $(MAKE) -C $$i $@; done
+	$(MAKE) -C build $@
 
-distclean:
-	rm -rf $(DIRS) Makefile
-
-doc:
-	$(MAKE) -C $(firstword $(DIRS)) $@
-
-.PHONY: all test install uninstall clean distclean
+.PHONY: all clean
 EOT
 )
 

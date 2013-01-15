@@ -1,18 +1,14 @@
 package org.libcppa.distributed
 
-import org.libcppa.utility._
+import org.libcppa.utility.KeyValuePair
+import org.libcppa.utility.IntStr
 
-import scala.actors._
-import scala.actors.Actor.self
-import scala.actors.remote.RemoteActor
-import scala.actors.remote.RemoteActor.{alive, select, register}
-import scala.actors.remote.Node
-import scala.actors.TIMEOUT
-
-import akka.actor.{ Props, Actor => AkkaActor, ActorRef => AkkaActorRef, ActorSystem }
+import akka.actor._
 import com.typesafe.config.ConfigFactory
 
 import scala.annotation.tailrec
+import scala.concurrent.duration._
+
 import Console.println
 
 case class Ping(value: Int)
@@ -25,6 +21,8 @@ case class Hello(token: String)
 case class Olleh(token: String)
 case class Error(msg: String, token: String)
 case class AddPong(path: String, token: String)
+case class SetParent(parent: ActorRef)
+
 
 case class AddPongTimeout(path: String, token: String)
 
@@ -59,121 +57,21 @@ trait ServerActorPrototype[T] {
                 try { (true, newPending(peers, path, token)) }
                 catch {
                     // catches match error and integer conversion failure
-                    case e => reply(Error(e.toString, token)); (false, peers)
+                    case e : Exception => reply(Error(e.toString, token)); (false, peers)
                 }
             }
         }
         case KickOff(value) => kickOff(peers, value); (false, peers)
         case AddPongTimeout(path, token) => handleAddPongTimeout(peers, path, token)
-        case TIMEOUT => handleTimeout(peers)
+        //case TIMEOUT => handleTimeout(peers)
     }
 }
 
-case class RemoteActorPath(uri: String, host: String, port: Int)
-
-class PingActor(parent: OutputChannel[Any], pongs: List[OutputChannel[Any]]) extends Actor {
-
-    private var left = pongs.length
-
-    private def recvLoop: Nothing = react {
-        case Pong(0) => {
-            parent ! Done
-            if (left > 1) {
-                left -= 1
-                recvLoop
-            }
-        }
-        case Pong(value) => sender ! Ping(value - 1); recvLoop
-    }
-
-    override def act() = react {
-        case KickOff(value) => pongs.foreach(_ ! Ping(value)); recvLoop
-    }
-}
-
-case class Peer(path: String, channel: OutputChannel[Any])
-case class PendingPeer(path: String, channel: OutputChannel[Any], client: OutputChannel[Any], clientToken: String)
-case class Peers(connected: List[Peer], pending: List[PendingPeer])
-
-class ServerActor(port: Int) extends Actor with ServerActorPrototype[Peers] {
-
-    //def reply(what: Any): Unit = sender ! what // inherited from ReplyReactor
-
-    protected override def kickOff(peers: Peers, value: Int) = {
-        (new PingActor(sender, peers.connected map (_.channel))).start ! KickOff(value)
-    }
-
-    protected override def connectionEstablished(peers: Peers, x: Any) = x match {
-        case PendingPeer(path, channel, client, token) => {
-            client ! Ok(token)
-            Peers(Peer(path, channel) :: peers.connected, peers.pending filterNot (_.clientToken == token))
-        }
-    }
-
-    protected def newPending(peers: Peers, path: String, token: String) : Peers = path split ":" match {
-        case Array(node, port) => {
-            val channel = select(new Node(node, port.toInt), 'Pong)
-            channel ! Hello(token)
-            //println("recv[" + peers + "]: sent 'Hello' to " + path)
-            Peers(peers.connected, PendingPeer(path, channel, sender, token) :: peers.pending)
-        }
-    }
-
-    protected override def handleTimeout(peers: Peers) = {
-        peers.pending foreach (x => x.client ! Error("cannot connect to " + x.path, x.clientToken))
-        (true, Peers(peers.connected, Nil))
-    }
-
-    override def act() {
-        RemoteActor classLoader = getClass().getClassLoader
-        alive(port)
-        register('Pong, self)
-        @tailrec def recvLoop(peers: Peers): Nothing = {
-            def recv(peers: Peers, receiveFun: PartialFunction[Any, (Boolean, Peers)] => (Boolean, Peers)): Peers = receiveFun(recvFun(peers))._2
-            recvLoop(recv(peers, if (peers.pending isEmpty) receive else receiveWithin(5000)))
-        }
-        recvLoop(Peers(Nil, Nil))
-    }
-
-}
-
-class ClientActor(pongPaths: List[RemoteActorPath], numPings: Int) extends Actor {
-    override def act() = {
-        RemoteActor classLoader = getClass().getClassLoader
-        val pongs = pongPaths map (x => {
-            val pong = select(new Node(x.host, x.port), 'Pong)
-            pongPaths foreach (y => if (x != y) pong ! AddPong(y.uri, x.uri + " -> " + y.uri))
-            pong
-        })
-        @tailrec def collectOkMessages(left: Int, receivedTokens: List[String]): Unit = {
-            if (left > 0)
-                collectOkMessages(left - 1, receiveWithin(10000) {
-                    case Ok(token) => token :: receivedTokens
-                    case Error(msg, token) => throw new RuntimeException("connection failed: " + token + ", message from server: " + msg)
-                    case TIMEOUT => throw new RuntimeException("no Ok within 10sec.\nreceived tokens:\n" + receivedTokens.sortWith(_.compareTo(_) < 0).mkString("\n"))
-                })
-        }
-        collectOkMessages(pongs.length * (pongs.length - 1), Nil)
-        // kickoff
-        pongs foreach (_ ! KickOff(numPings))
-        // collect done messages
-        for (_ <- 1 until (pongs.length * (pongs.length - 1))) {
-            receiveWithin(30*60*1000) {
-                case Done => Unit
-                case TIMEOUT => throw new RuntimeException("no Done within 30min")
-                case x => throw new RuntimeException("Unexpected message: " + x.toString)
-            }
-        }
-    }
-}
-
-case class SetParent(parent: AkkaActorRef)
-
-class AkkaPingActor(pongs: List[AkkaActorRef]) extends AkkaActor {
+class PingActor(pongs: List[ActorRef]) extends Actor {
 
     import context.become
 
-    private var parent: AkkaActorRef = null
+    private var parent: ActorRef = null
     private var left = pongs.length
 
     private def recvLoop: Receive = {
@@ -192,52 +90,52 @@ class AkkaPingActor(pongs: List[AkkaActorRef]) extends AkkaActor {
     }
 }
 
-case class AkkaPeer(path: String, channel: AkkaActorRef)
-case class PendingAkkaPeer(path: String, channel: AkkaActorRef, client: AkkaActorRef, clientToken: String)
-case class AkkaPeers(connected: List[AkkaPeer], pending: List[PendingAkkaPeer])
+case class Peer(path: String, channel: ActorRef)
+case class PendingPeer(path: String, channel: ActorRef, client: ActorRef, clientToken: String)
+case class Peers(connected: List[Peer], pending: List[PendingPeer])
 
-class AkkaServerActor(system: ActorSystem) extends AkkaActor with ServerActorPrototype[AkkaPeers] {
+class ServerActor(system: ActorSystem) extends Actor with ServerActorPrototype[Peers] {
 
     import context.become
 
     protected  def reply(what: Any): Unit = sender ! what
 
-    protected def kickOff(peers: AkkaPeers, value: Int): Unit = {
-        val ping = context.actorOf(Props(new AkkaPingActor(peers.connected map (_.channel))))
+    protected def kickOff(peers: Peers, value: Int): Unit = {
+        val ping = context.actorOf(Props(new PingActor(peers.connected map (_.channel))))
         ping ! SetParent(sender)
         ping ! KickOff(value)
         //println("[" + peers + "]: KickOff(" + value + ")")
     }
 
-    protected def connectionEstablished(peers: AkkaPeers, x: Any): AkkaPeers = x match {
-        case PendingAkkaPeer(path, channel, client, token) => {
+    protected def connectionEstablished(peers: Peers, x: Any): Peers = x match {
+        case PendingPeer(path, channel, client, token) => {
             client ! Ok(token)
             //println("connected to " + path)
-            AkkaPeers(AkkaPeer(path, channel) :: peers.connected, peers.pending filterNot (_.clientToken == token))
+            Peers(Peer(path, channel) :: peers.connected, peers.pending filterNot (_.clientToken == token))
         }
     }
 
-    protected def newPending(peers: AkkaPeers, path: String, token: String) : AkkaPeers = {
+    protected def newPending(peers: Peers, path: String, token: String) : Peers = {
+        import context.dispatcher // Use this Actors' Dispatcher as ExecutionContext
         val channel = system.actorFor(path)
         channel ! Hello(token)
-        import akka.util.duration._
         system.scheduler.scheduleOnce(5 seconds, self, AddPongTimeout(path, token))
         //println("[" + peers + "]: sent 'Hello' to " + path)
-        AkkaPeers(peers.connected, PendingAkkaPeer(path, channel, sender, token) :: peers.pending)
+        Peers(peers.connected, PendingPeer(path, channel, sender, token) :: peers.pending)
     }
 
-    protected override def handleAddPongTimeout(peers: AkkaPeers, path: String, token: String) = {
+    protected override def handleAddPongTimeout(peers: Peers, path: String, token: String) = {
         peers.pending find (x => x.path == path && x.clientToken == token) match {
-            case Some(PendingAkkaPeer(_, channel, client, _)) => {
+            case Some(PendingPeer(_, channel, client, _)) => {
                 client ! Error(path + " did not respond", token)
                 //println(path + " did not respond")
-                (true, AkkaPeers(peers.connected, peers.pending filterNot (x => x.path == path && x.clientToken == token)))
+                (true, Peers(peers.connected, peers.pending filterNot (x => x.path == path && x.clientToken == token)))
             }
             case None => (false, peers)
         }
     }
 
-    def bhvr(peers: AkkaPeers): Receive = {
+    def bhvr(peers: Peers): Receive = {
         case x => {
             recvFun(peers)(x) match {
                 case (true, newPeers) => become(bhvr(newPeers))
@@ -246,14 +144,14 @@ class AkkaServerActor(system: ActorSystem) extends AkkaActor with ServerActorPro
         }
     }
 
-    def receive = bhvr(AkkaPeers(Nil, Nil))
+    def receive = bhvr(Peers(Nil, Nil))
 
 }
 
 case class TokenTimeout(token: String)
-case class RunAkkaClient(paths: List[String], numPings: Int)
+case class RunClient(paths: List[String], numPings: Int)
 
-class AkkaClientActor(system: ActorSystem) extends AkkaActor {
+class ClientActor(system: ActorSystem) extends Actor {
 
     import context.become
 
@@ -272,7 +170,7 @@ class AkkaClientActor(system: ActorSystem) extends AkkaActor {
         }
     }
 
-    def collectOkMessages(pongs: List[AkkaActorRef], left: Int, receivedTokens: List[String], numPings: Int): Receive = {
+    def collectOkMessages(pongs: List[ActorRef], left: Int, receivedTokens: List[String], numPings: Int): Receive = {
         case Ok(token) => {
 //println("Ok")
             if (left == 1) {
@@ -299,15 +197,15 @@ class AkkaClientActor(system: ActorSystem) extends AkkaActor {
     }
 
     def receive = {
-        case RunAkkaClient(paths, numPings) => {
-//println("RunAkkaClient(" + paths.toString + ", " + numPings + ")")
-            import akka.util.duration._
+        case RunClient(paths, numPings) => {
+//println("RunClient(" + paths.toString + ", " + numPings + ")")
             val pongs = paths map (x => {
                 val pong = system.actorFor(x)
                 paths foreach (y => if (x != y) {
                     val token = x + " -> " + y
                     pong ! AddPong(y, token)
 //println(x + " ! AddPong(" + y + ", " + token + ")")
+                    import context.dispatcher // Use this Actors' Dispatcher as ExecutionContext
                     system.scheduler.scheduleOnce(10 seconds, self, TokenTimeout(token))
                 })
                 pong
@@ -319,13 +217,9 @@ class AkkaClientActor(system: ActorSystem) extends AkkaActor {
 
 class Distributed {
 
-    def runServer(port: Int) {
-        (new ServerActor(port)).start
-    }
-
-    def runAkkaServer() {
+    def runServer() {
         val system = ActorSystem("pongServer", ConfigFactory.load.getConfig("pongServer"))
-        system.actorOf(Props(new AkkaServerActor(system)), "pong")
+        system.actorOf(Props(new ServerActor(system)), "pong")
     }
 
     //private val NumPings = "num_pings=([0-9]+)".r
@@ -348,14 +242,8 @@ class Distributed {
 
     def runBenchmark(args: List[String]) {
         run(args, Nil, None, ((paths, x) => {
-            (new ClientActor(paths map (path => path match { case SimpleUri(host, port) => RemoteActorPath(path, host, port.toInt) }), x)).start
-        }))
-    }
-
-    def runAkkaBenchmark(args: List[String]) {
-        run(args, Nil, None, ((paths, x) => {
             val system = ActorSystem("benchmark", ConfigFactory.load.getConfig("benchmark"))
-            system.actorOf(Props(new AkkaClientActor(system))) ! RunAkkaClient(paths, x)
+            system.actorOf(Props(new ClientActor(system))) ! RunClient(paths, x)
             global.latch.await
             system.shutdown
             System.exit(0)
@@ -369,12 +257,9 @@ object Main {
     val prog = new Distributed
 
     def main(args: Array[String]): Unit = args match {
-        // server mode
-        case Array("mode=server", "remote_actors", IntStr(port)) => prog.runServer(port)
-        case Array("mode=server", "akka") => prog.runAkkaServer
+        case Array("mode=server") => prog.runServer
         // client mode
-        case Array("mode=benchmark", "remote_actors", _*) => prog.runBenchmark(args.toList.drop(2))
-        case Array("mode=benchmark", "akka", _*) => prog.runAkkaBenchmark(args.toList.drop(2))
+        case Array("mode=benchmark", _*) => prog.runBenchmark(args.toList.drop(2))
         // error
         case _ => {
             println("Running in server mode:\n"                              +

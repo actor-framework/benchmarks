@@ -1,4 +1,3 @@
-*.beam
-*.class
-cppa/Makefile
-cppa/build/*
+Makefile
+build/*
+bin/*
