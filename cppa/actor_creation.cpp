@@ -90,7 +90,7 @@ void stacked_testee(actor_ptr parent) {
 }
 
 void usage() {
-    cout << "usage: actor_creation (stacked|event-based) POW" << endl
+    cout << "usage: actor_creation [--stacked] POW" << endl
          << "       creates 2^POW actors" << endl
          << endl;
 }
@@ -98,10 +98,10 @@ void usage() {
 int main(int argc, char** argv) {
     vector<string> args(argv + 1, argv + argc);
     match (args) (
-        on("stacked", spro<uint32_t>) >> [](uint32_t num) {
+        on("--stacked", spro<uint32_t>) >> [](uint32_t num) {
             send(spawn(stacked_testee, self), atom("spread"), num);
         },
-        on("event-based", spro<uint32_t>) >> [](uint32_t num) {
+        on(spro<uint32_t>) >> [](uint32_t num) {
             send(spawn<testee>(self), atom("spread"), num);
         },
         others() >> usage

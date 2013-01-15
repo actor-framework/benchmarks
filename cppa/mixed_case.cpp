@@ -32,6 +32,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <functional>
 
 #include "utility.hpp"
 
@@ -232,7 +233,7 @@ void run_test(F spawn_impl,
 
 void usage() {
     cout << "usage: mailbox_performance "
-            "(stacked|event-based) (num rings) (ring size) "
+            "[--stacked] (num rings) (ring size) "
             "(initial token value) (repetitions)"
          << endl
          << endl;
@@ -241,33 +242,33 @@ void usage() {
 
 enum impl_type { stacked, event_based };
 
-option<impl_type> stoimpl(const std::string& str) {
-    if (str == "stacked") return stacked;
-    else if (str == "event-based") return event_based;
-    return {};
+void run(impl_type impl, int num_rings, int ring_size, int initial_token_value, int repetitions) {
+    int num_msgs = num_rings + (num_rings * repetitions);
+    auto sv = (impl == event_based) ? spawn<fsm_supervisor>(num_msgs)
+                                    : spawn(supervisor, num_msgs);
+    if (impl == event_based) {
+        run_test([sv] { return spawn<fsm_chain_master>(sv); },
+                 num_rings, ring_size, initial_token_value, repetitions);
+    }
+    else {
+        run_test([sv] { return spawn(chain_master, sv); },
+                 num_rings, ring_size, initial_token_value, repetitions);
+    }
 }
 
 int main(int argc, char** argv) {
+    using namespace std::placeholders;
     announce<factors>();
-    int result = 1;
     std::vector<std::string> args{argv + 1, argv + argc};
+    std::function<void (int,int,int,int)> f;
+    if (!args.empty() && args.front() == "--stacked") {
+        f = std::bind(run, stacked, _1, _2, _3, _4);
+        args.erase(args.begin());
+    }
+    else f = std::bind(run, event_based, _1, _2, _3, _4);
     match(args) (
-        on(stoimpl, spro<int>, spro<int>, spro<int>, spro<int>)
-        >> [&](impl_type impl, int num_rings, int ring_size, int initial_token_value, int repetitions) {
-            int num_msgs = num_rings + (num_rings * repetitions);
-            auto sv = (impl == event_based) ? spawn<fsm_supervisor>(num_msgs)
-                                            : spawn(supervisor, num_msgs);
-            if (impl == event_based) {
-                run_test([sv] { return spawn<fsm_chain_master>(sv); },
-                         num_rings, ring_size, initial_token_value, repetitions);
-            }
-            else {
-                run_test([sv] { return spawn(chain_master, sv); },
-                         num_rings, ring_size, initial_token_value, repetitions);
-            }
-            result = 0; // no error occurred
-        },
+        on(spro<int>, spro<int>, spro<int>, spro<int>) >> f,
         others() >> usage
     );
-    return result;
+    return 0;
 }

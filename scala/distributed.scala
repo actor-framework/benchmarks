@@ -1,7 +1,6 @@
-package org.libcppa.distributed
+package org.libcppa
 
-import org.libcppa.utility.KeyValuePair
-import org.libcppa.utility.IntStr
+import org.libcppa.utility._
 
 import akka.actor._
 import com.typesafe.config.ConfigFactory
@@ -30,42 +29,9 @@ object global {
     val latch = new java.util.concurrent.CountDownLatch(1)
 }
 
-trait ServerActorPrototype[T] {
-
-    protected def reply(what: Any): Unit
-    protected def kickOff(old: T, value: Int): Unit
-    protected def connectionEstablished(peers: T, pending: Any): T
-    protected def newPending(peers: T, path: String, token: String) : T
-    protected def handleTimeout(peers: T): (Boolean, T) = throw new RuntimeException("unsupported timeout")
-    protected def handleAddPongTimeout(peers: T, path: String, token: String): (Boolean, T) = throw new RuntimeException("unsupported timeout")
-
-    def recvFun(peers: T { def connected: List[{ def path: String }]; def pending: List[{ def clientToken: String }] }): PartialFunction[Any, (Boolean, T)] = {
-        case Ping(value) => reply(Pong(value)); (false, peers)
-        case Hello(token) => reply(Olleh(token)); (false, peers)
-        case Olleh(token) => peers.pending find (_.clientToken == token) match {
-            case Some(x) => (true, connectionEstablished(peers, x))
-            case None => (false, peers)
-        }
-        case AddPong(path, token) => {
-            //println("received AddPong(" + path + ", " + token + ")")
-            if (peers.connected exists (_.path == path)) {
-                reply(Ok(token))
-                //println("recv[" + peers + "]: " + path + " cached (replied 'Ok')")
-                (false, peers)
-            }
-            else {
-                try { (true, newPending(peers, path, token)) }
-                catch {
-                    // catches match error and integer conversion failure
-                    case e : Exception => reply(Error(e.toString, token)); (false, peers)
-                }
-            }
-        }
-        case KickOff(value) => kickOff(peers, value); (false, peers)
-        case AddPongTimeout(path, token) => handleAddPongTimeout(peers, path, token)
-        //case TIMEOUT => handleTimeout(peers)
-    }
-}
+case class Peer(path: String, channel: ActorRef)
+case class Peers(connected: List[Peer], pending: List[PendingPeer])
+case class PendingPeer(path: String, channel: ActorRef, client: ActorRef, clientToken: String)
 
 class PingActor(pongs: List[ActorRef]) extends Actor {
 
@@ -74,7 +40,7 @@ class PingActor(pongs: List[ActorRef]) extends Actor {
     private var parent: ActorRef = null
     private var left = pongs.length
 
-    private def recvLoop: Receive = {
+    private final def recvLoop: Receive = {
         case Pong(0) => {
             parent ! Done
             //println(parent.toString + " ! Done")
@@ -90,24 +56,20 @@ class PingActor(pongs: List[ActorRef]) extends Actor {
     }
 }
 
-case class Peer(path: String, channel: ActorRef)
-case class PendingPeer(path: String, channel: ActorRef, client: ActorRef, clientToken: String)
-case class Peers(connected: List[Peer], pending: List[PendingPeer])
-
-class ServerActor(system: ActorSystem) extends Actor with ServerActorPrototype[Peers] {
+class ServerActor(system: ActorSystem) extends Actor {
 
     import context.become
 
-    protected  def reply(what: Any): Unit = sender ! what
+    private final def reply(what: Any): Unit = sender ! what
 
-    protected def kickOff(peers: Peers, value: Int): Unit = {
+    private final def kickOff(peers: Peers, value: Int): Unit = {
         val ping = context.actorOf(Props(new PingActor(peers.connected map (_.channel))))
         ping ! SetParent(sender)
         ping ! KickOff(value)
         //println("[" + peers + "]: KickOff(" + value + ")")
     }
 
-    protected def connectionEstablished(peers: Peers, x: Any): Peers = x match {
+    private final def connectionEstablished(peers: Peers, x: Any): Peers = x match {
         case PendingPeer(path, channel, client, token) => {
             client ! Ok(token)
             //println("connected to " + path)
@@ -115,7 +77,7 @@ class ServerActor(system: ActorSystem) extends Actor with ServerActorPrototype[P
         }
     }
 
-    protected def newPending(peers: Peers, path: String, token: String) : Peers = {
+    private final def newPending(peers: Peers, path: String, token: String) : Peers = {
         import context.dispatcher // Use this Actors' Dispatcher as ExecutionContext
         val channel = system.actorFor(path)
         channel ! Hello(token)
@@ -124,24 +86,40 @@ class ServerActor(system: ActorSystem) extends Actor with ServerActorPrototype[P
         Peers(peers.connected, PendingPeer(path, channel, sender, token) :: peers.pending)
     }
 
-    protected override def handleAddPongTimeout(peers: Peers, path: String, token: String) = {
+    private final def handleAddPongTimeout(peers: Peers, path: String, token: String) = {
         peers.pending find (x => x.path == path && x.clientToken == token) match {
             case Some(PendingPeer(_, channel, client, _)) => {
                 client ! Error(path + " did not respond", token)
                 //println(path + " did not respond")
-                (true, Peers(peers.connected, peers.pending filterNot (x => x.path == path && x.clientToken == token)))
+                become(bhvr(Peers(peers.connected, peers.pending filterNot (x => x.path == path && x.clientToken == token))))
             }
-            case None => (false, peers)
+            case None => Unit
         }
     }
 
     def bhvr(peers: Peers): Receive = {
-        case x => {
-            recvFun(peers)(x) match {
-                case (true, newPeers) => become(bhvr(newPeers))
-                case _ => Unit
+        case Ping(value) => reply(Pong(value))
+        case Hello(token) => reply(Olleh(token))
+        case Olleh(token) => peers.pending.find (_.clientToken == token) match {
+            case Some(x) => connectionEstablished(peers, x); become(bhvr(peers))
+            case None => Unit
+        }
+        case AddPong(path, token) => {
+            //println("received AddPong(" + path + ", " + token + ")")
+            if (peers.connected exists (_.path == path)) {
+                reply(Ok(token))
+                //println("recv[" + peers + "]: " + path + " cached (replied 'Ok')")
+            }
+            else {
+                try { become(bhvr(newPending(peers, path, token))) }
+                catch {
+                    // catches match error and integer conversion failure
+                    case e : Exception => reply(Error(e.toString, token))
+                }
             }
         }
+        case KickOff(value) => kickOff(peers, value)
+        case AddPongTimeout(path, token) => handleAddPongTimeout(peers, path, token)
     }
 
     def receive = bhvr(Peers(Nil, Nil))
@@ -215,7 +193,7 @@ class ClientActor(system: ActorSystem) extends Actor {
     }
 }
 
-class Distributed {
+object distributed {
 
     def runServer() {
         val system = ActorSystem("pongServer", ConfigFactory.load.getConfig("pongServer"))
@@ -225,7 +203,7 @@ class Distributed {
     //private val NumPings = "num_pings=([0-9]+)".r
     private val SimpleUri = "([0-9a-zA-Z\\.]+):([0-9]+)".r
 
-    @tailrec private def run(args: List[String], paths: List[String], numPings: Option[Int], finalizer: (List[String], Int) => Unit): Unit = args match {
+    @tailrec private final def run(args: List[String], paths: List[String], numPings: Option[Int], finalizer: (List[String], Int) => Unit): Unit = args match {
         case KeyValuePair("num_pings", IntStr(num)) :: tail => numPings match {
             case Some(x) => throw new IllegalArgumentException("\"num_pings\" already defined, first value = " + x + ", second value = " + num)
             case None => run(tail, paths, Some(num), finalizer)
@@ -250,16 +228,10 @@ class Distributed {
         }))
     }
 
-}
-
-object Main {
-
-    val prog = new Distributed
-
     def main(args: Array[String]): Unit = args match {
-        case Array("mode=server") => prog.runServer
+        case Array("mode=server") => runServer
         // client mode
-        case Array("mode=benchmark", _*) => prog.runBenchmark(args.toList.drop(2))
+        case Array("mode=benchmark", _*) => runBenchmark(args.toList.drop(2))
         // error
         case _ => {
             println("Running in server mode:\n"                              +

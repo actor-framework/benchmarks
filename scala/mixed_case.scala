@@ -1,6 +1,6 @@
-package org.libcppa.mixed_case
+package org.libcppa
 
-import org.libcppa.utility.IntStr
+import org.libcppa.utility._
 
 import scala.actors.Actor
 import scala.actors.Actor._
@@ -21,7 +21,6 @@ object global {
     final val factor1: Long = 86028157
     final val factor2: Long = 329545133
     final val factors = List(factor2,factor1)
-    val latch = new java.util.concurrent.CountDownLatch(1)
     def checkFactors(f: List[Long]) {
         assert(f equals factors)
     }
@@ -204,7 +203,7 @@ class AkkaSupervisor(numMessages: Int) extends AkkaActor {
     def inc() {
         i = i + 1
         if (i == numMessages) {
-            global.latch.countDown
+            global_latch.countDown
             context.stop(self)
         }
     }
@@ -237,13 +236,13 @@ class MixedCase(numRings: Int, ringSize: Int, initToken: Int, reps: Int) {
         val system = ActorSystem();
         val s = system.actorOf(Props(new AkkaSupervisor(numMessages)))
         s ! initMsg
-        global.latch.await
+        global_latch.await
         system.shutdown
         System.exit(0)
     }
 }
 
-object Main {
+object mixed_case {
 
     def usage() = {
         Console println "usage: ('threaded'|'threadless'|'akka') (num rings) (ring size) (initial token value) (repetitions)"

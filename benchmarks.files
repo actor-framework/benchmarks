@@ -1,7 +1,6 @@
 utility.hpp
 cppa/actor_creation.cpp
 cppa/distributed.cpp
-cppa/get_compiler_version.cpp
 cppa/mailbox_performance.cpp
 cppa/matching.cpp
 cppa/mixed_case.cpp
@@ -14,9 +13,9 @@ erlang/distributed.erl
 erlang/mailbox_performance.erl
 erlang/matching.erl
 erlang/mixed_case.erl
-scala/ActorCreation.scala
-scala/Distributed.scala
-scala/MailboxPerformance.scala
-scala/Matching.scala
-scala/MixedCase.scala
-scala/Utility.scala
+scala/actor_creation.scala
+scala/distributed.scala
+scala/mailbox_performance.scala
+scala/matching.scala
+scala/mixed_case.scala
+scala/utility.scala

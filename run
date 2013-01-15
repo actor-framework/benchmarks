@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# $1:   cppa|scala|erlang
+# $bench:   mixed_case|actor_creation|mailbox_performance|distributed
+# $...: args
+
+usage="\
+usage: $0 (cppa|scala|erlang) (mixed_case|actor_creation|mailbox_performance|distributed)
+"
+
+if [[ $# < 2 ]]; then
+    echo "too few arguments"; echo; echo "$usage"
+    exit
+fi
+
+cmd=""
+impl="$1"
+bench="$2"
+shift;shift
+
+case "$impl" in
+    cppa)
+        cmd="./$bench $@"
+        ;;
+    scala)
+        cmd="scala org.libcppa.$bench $@"
+        ;;
+    erlang)
+        cmd="erl -noshell -noinput +P 20000000 -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
+        ;;
+    theron)
+        cmd="./theron_$bench $@"
+        ;;
+    *)
+        echo "invalid argument: $impl"; echo; echo "$usage"
+        exit 1
+        ;;
+esac
+
+cd bin
+export JAVA_OPTS="-Xmx4096M"
+if [[ $(uname) == "Darwin" ]] ; then
+    /usr/bin/time -p $cmd 2>&1
+else
+    /usr/bin/time -p -f "%e" $cmd 2>&1
+fi
+cd ..

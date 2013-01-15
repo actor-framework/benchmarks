@@ -73,39 +73,40 @@ void sender(actor_ptr whom, uint64_t count) {
 
 void usage() {
     cout << "usage: mailbox_performance "
-            "(stacked|event-based) NUM_THREADS MSGS_PER_THREAD" << endl
+            "[--stacked] NUM_THREADS MSGS_PER_THREAD" << endl
          << endl;
+    exit(1);
 }
 
 enum impl_type { stacked, event_based };
 
-option<impl_type> stoimpl(const std::string& str) {
-    if (str == "stacked") return stacked;
-    else if (str == "event-based") return event_based;
-    return {};
+void run(impl_type impl, uint64_t num_sender, uint64_t num_msgs) {
+    auto total = num_sender * num_msgs;
+    auto testee = (impl == stacked) ? spawn(receiver, total)
+                                    : spawn<fsm_receiver>(total);
+    vector<thread> senders;
+    for (uint64_t i = 0; i < num_sender; ++i) {
+        senders.emplace_back(sender, testee, num_msgs);
+    }
+    for (auto& s : senders) {
+        s.join();
+    }
 }
 
 int main(int argc, char** argv) {
-    int result = 1;
+    using namespace std::placeholders;
     vector<string> args(argv + 1, argv + argc);
+    std::function<void (uint64_t,uint64_t)> f;
+    if (!args.empty() && args.front() == "--stacked") {
+        f = std::bind(run, stacked, _1, _2);
+        args.erase(args.begin());
+    }
+    else f = std::bind(run, event_based, _1, _2);
     match (args) (
-        on(stoimpl, spro<uint64_t>, spro<uint64_t>) >> [&](impl_type impl, uint64_t num_sender, uint64_t num_msgs) {
-            auto total = num_sender * num_msgs;
-            auto testee = (impl == stacked) ? spawn(receiver, total)
-                                            : spawn<fsm_receiver>(total);
-            vector<thread> senders;
-            for (uint64_t i = 0; i < num_sender; ++i) {
-                senders.emplace_back(sender, testee, num_msgs);
-            }
-            for (auto& s : senders) {
-                s.join();
-            }
-            result = 0; // no error occurred
-        },
+        on(spro<uint64_t>, spro<uint64_t>) >> f,
         others() >> usage
-
     );
     await_all_others_done();
     shutdown();
-    return result;
+    return 0;
 }
