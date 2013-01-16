@@ -6,49 +6,6 @@ include_directories(.)
 
 set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
-# check if the user provided CXXFLAGS on the command line
-if (CMAKE_CXX_FLAGS)
-    set(CXXFLAGS_PROVIDED true)
-endif ()
-if (CXXFLAGS_PROVIDED)
-  set(CMAKE_CXX_FLAGS_DEBUG          "")
-  set(CMAKE_CXX_FLAGS_MINSIZEREL     "")
-  set(CMAKE_CXX_FLAGS_RELEASE        "")
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "")
-else ()
-  set(CMAKE_CXX_FLAGS                "-std=c++11 -Wextra -Wall -pedantic")
-  set(CMAKE_CXX_FLAGS_DEBUG          "-O0 -g")
-  set(CMAKE_CXX_FLAGS_MINSIZEREL     "-Os")
-  set(CMAKE_CXX_FLAGS_RELEASE        "-O4")
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
-endif ()
-
-# check for g++ >= 4.7 or clang++ > = 3.2
-try_run(ProgramResult
-        CompilationSucceeded
-        ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/get_compiler_version.cpp
-        RUN_OUTPUT_VARIABLE CompilerVersion)
-if (NOT CompilationSucceeded OR NOT ProgramResult EQUAL 0)
-  message(FATAL_ERROR "Cannot determine compiler version")
-elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-  if (CompilerVersion VERSION_GREATER 4.6)
-    message(STATUS "Found g++ version ${CompilerVersion}")
-  else ()
-    message(FATAL_ERROR "g++ >= 4.7 required (found: ${CompilerVersion}.")
-  endif ()
-elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-  if (CompilerVersion VERSION_GREATER 3.1)
-    message(STATUS "Found clang++ version ${CompilerVersion}")
-  else ()
-    message(FATAL_ERROR "clang++ >= 3.2 required (found: ${CompilerVersion}.")
-  endif ()
-  if (NOT CXXFLAGS_PROVIDED)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-  endif ()
-else ()
-  message(FATAL_ERROR "Your C++ compiler does not support C++11.")
-endif ()
-
 find_package(LibCPPA REQUIRED)
 find_package(Boost REQUIRED)
 include_directories(. .. ${CPPA_INCLUDE} ${Boost_INCLUDE_DIRS})
@@ -64,23 +21,3 @@ add_benchmark(mailbox_performance)
 add_benchmark(mixed_case)
 add_benchmark(distributed)
 add_benchmark(matching)
-
-# done (print summary)
-message("\n====================|  Build Summary  |===================="
-        "\n"
-        "\nBuild type:        ${CMAKE_BUILD_TYPE}"
-        "\n"
-        "\nCXX:               ${CMAKE_CXX_COMPILER}"
-        "\nCXXFLAGS:          ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${build_type}}"
-        "\nLD_DIRS:           ${LD_DIRS}"
-        "\nLIBRARIES:         ${LD_FLAGS}"
-        "\n"
-        "\nSource directory:  ${CMAKE_SOURCE_DIR}"
-        "\nBuild directory:   ${CMAKE_BINARY_DIR}"
-        "\nExecutable path:   ${EXECUTABLE_OUTPUT_PATH}"
-        "\nLibrary path:      ${LIBRARY_OUTPUT_PATH}"
-        "\nInstall prefix:    ${CMAKE_INSTALL_PREFIX}"
-        "\n"
-        "\nBoost:             ${Boost_INCLUDE_DIR}"
-        "\n"
-        "\n===========================================================\n")

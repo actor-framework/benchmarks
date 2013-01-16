@@ -57,6 +57,7 @@ if ("${DISABLED_BENCHMARKS}" MATCHES "theron")
   message (STATUS "skip Theron benchmarks (disabled)")
 else ()
   add_subdirectory(theron)
+  add_dependencies(benchmark_target theron_benchmarks)
 endif ()
 
 
