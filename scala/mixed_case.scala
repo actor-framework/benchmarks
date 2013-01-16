@@ -2,9 +2,7 @@ package org.libcppa
 
 import org.libcppa.utility._
 
-import scala.actors.Actor
-import scala.actors.Actor._
-import akka.actor.{ Props, Actor => AkkaActor, ActorRef => AkkaActorRef, ActorSystem }
+import akka.actor._
 import scala.annotation.tailrec
 
 case class Token(value: Int)
@@ -35,128 +33,14 @@ object global {
     }
 }
 
-class ThreadedWorker(supervisor: Actor) extends Actor {
-    override def act() {
-        var done = false
-        while (done == false) {
-            receive {
-                case Calc(value) => supervisor ! Factors(global.factorize(value))
-                case Done => done = true
-            }
-        }
-    }
-}
-
-class ThreadedChainLink(next: Actor) extends Actor {
-    override def act() {
-        var done = false
-        while (done == false)
-            receive {
-                case Token(value) => next ! Token(value); if (value == 0) done = true
-            }
-    }
-}
-
-class ThreadedChainMaster(supervisor: Actor) extends Actor {
-    val worker = (new ThreadedWorker(supervisor)).start
-    @tailrec final def newRing(next: Actor, rsize: Int): Actor = {
-        if (rsize == 0) next
-        else newRing((new ThreadedChainLink(next)).start, rsize-1)
-    }
-    override def act() = receive {
-        case Init(rsize, initialTokenValue, repetitions) =>
-            for (_ <- 0 until repetitions) {
-                worker ! Calc(global.taskN)
-                val next = newRing(this, rsize-1)
-                next ! Token(initialTokenValue)
-                var ringDone = false
-                while (ringDone == false) {
-                    receive {
-                        case Token(0) => ringDone = true
-                        case Token(value) => next ! Token(value-1)
-                    }
-                }
-            }
-            worker ! Done
-            supervisor ! MasterExited
-    }
-}
-
-class ThreadedSupervisor(numMessages: Int) extends Actor {
-    override def act() = for (_ <- 0 until numMessages) {
-        receive {
-            case Factors(f) => global.checkFactors(f)
-            case MasterExited =>
-        }
-    }
-}
-
-class ThreadlessWorker(supervisor: Actor) extends Actor {
-    override def act() = react {
-        case Calc(value) => supervisor ! Factors(global.factorize(value)); act
-        case Done => // recursion ends
-    }
-}
-
-class ThreadlessChainLink(next: Actor) extends Actor {
-    override def act() = react {
-        case Token(value) => next ! Token(value); if (value > 0) act
-    }
-}
-
-class ThreadlessChainMaster(supervisor: Actor) extends Actor {
-    val worker = (new ThreadlessWorker(supervisor)).start
-    @tailrec final def newRing(next: Actor, rsize: Int): Actor = {
-        if (rsize == 0) next
-        else newRing((new ThreadlessChainLink(next)).start, rsize-1)
-    }
-    var initialTokenValue = 0
-    var repetitions = 0
-    var iteration = 0
-    var rsize = 0
-    var next: Actor = null
-    def rloop(): Nothing = react {
-        case Token(0) =>
-            iteration += 1
-            if (iteration < repetitions) {
-                worker ! Calc(global.taskN)
-                next = newRing(this, rsize-1)
-                next ! Token(initialTokenValue)
-                rloop
-            }
-            else
-            {
-                worker ! Done
-                supervisor ! MasterExited
-            }
-        case Token(value) => next ! Token(value-1) ; rloop
-    }
-    override def act() = react {
-        case Init(rs, itv, rep) =>
-            rsize = rs ; initialTokenValue = itv ; repetitions = rep
-            worker ! Calc(global.taskN)
-            next = newRing(this, rsize-1)
-            next ! Token(initialTokenValue)
-            rloop
-    }
-}
-
-class ThreadlessSupervisor(numMessages: Int) extends Actor {
-    def rcv(remaining: Int): Nothing = react {
-        case Factors(f) => global.checkFactors(f); if (remaining > 1) rcv(remaining-1)
-        case MasterExited => if (remaining > 1) rcv(remaining-1)
-    }
-    override def act() = rcv(numMessages)
-}
-
-class AkkaWorker(supervisor: AkkaActorRef) extends AkkaActor {
+class Worker(supervisor: ActorRef) extends Actor {
     def receive = {
         case Calc(value) => supervisor ! Factors(global.factorize(value))
         case Done => context.stop(self)
     }
 }
 
-class AkkaChainLink(next: AkkaActorRef) extends AkkaActor {
+class ChainLink(next: ActorRef) extends Actor {
     def receive = {
         case Token(value) => {
             next ! Token(value)
@@ -165,14 +49,14 @@ class AkkaChainLink(next: AkkaActorRef) extends AkkaActor {
     }
 }
 
-class AkkaChainMaster(supervisor: AkkaActorRef, worker: AkkaActorRef) extends AkkaActor {
+class ChainMaster(supervisor: ActorRef, worker: ActorRef) extends Actor {
 
-    @tailrec final def newRing(next: AkkaActorRef, rsize: Int): AkkaActorRef = {
+    @tailrec final def newRing(next: ActorRef, rsize: Int): ActorRef = {
         if (rsize == 0) next
-        else newRing(context.actorOf(Props(new AkkaChainLink(next))), rsize-1)
+        else newRing(context.actorOf(Props(new ChainLink(next))), rsize-1)
     }
 
-    def initialized(ringSize: Int, initialTokenValue: Int, repetitions: Int, next: AkkaActorRef, iteration: Int): Receive = {
+    def initialized(ringSize: Int, initialTokenValue: Int, repetitions: Int, next: ActorRef, iteration: Int): Receive = {
         case Token(0) =>
             if (iteration + 1 < repetitions) {
                 worker ! Calc(global.taskN)
@@ -198,7 +82,7 @@ class AkkaChainMaster(supervisor: AkkaActorRef, worker: AkkaActorRef) extends Ak
     }
 }
 
-class AkkaSupervisor(numMessages: Int) extends AkkaActor {
+class Supervisor(numMessages: Int) extends Actor {
     var i = 0
     def inc() {
         i = i + 1
@@ -213,51 +97,29 @@ class AkkaSupervisor(numMessages: Int) extends AkkaActor {
         case Init(numRings, iterations, repetitions) =>
             val initMsg = Init(numRings, iterations, repetitions)
             for (_ <- 0 until numRings) {
-                val worker = context.actorOf(Props(new AkkaWorker(self)))
-                context.actorOf(Props(new AkkaChainMaster(self, worker))) ! initMsg
+                val worker = context.actorOf(Props(new Worker(self)))
+                context.actorOf(Props(new ChainMaster(self, worker))) ! initMsg
             }
-    }
-}
-
-class MixedCase(numRings: Int, ringSize: Int, initToken: Int, reps: Int) {
-    final val numMessages = numRings + (numRings * reps)
-    final val initMsg = Init(ringSize, initToken, reps)
-    def runThreaded() {
-        val s = (new ThreadedSupervisor(numMessages)).start
-        for (_ <- 0 until numRings)
-            (new ThreadedChainMaster(s)).start ! initMsg
-    }
-    def runThreadless() {
-        val s = (new ThreadlessSupervisor(numMessages)).start
-        for (_ <- 0 until numRings)
-            (new ThreadlessChainMaster(s)).start ! initMsg
-    }
-    def runAkka() {
-        val system = ActorSystem();
-        val s = system.actorOf(Props(new AkkaSupervisor(numMessages)))
-        s ! initMsg
-        global_latch.await
-        system.shutdown
-        System.exit(0)
     }
 }
 
 object mixed_case {
 
     def usage() = {
-        Console println "usage: ('threaded'|'threadless'|'akka') (num rings) (ring size) (initial token value) (repetitions)"
+        Console println "usage: (num rings) (ring size) (initial token value) (repetitions)"
         System.exit(1) // why doesn't exit return Nothing?
     }
 
     def main(args: Array[String]): Unit = args match {
-        case Array(impl, IntStr(numRings), IntStr(ringSize), IntStr(initToken), IntStr(reps)) => {
-            val mc = new MixedCase(numRings, ringSize, initToken, reps);
-            impl match {
-                case "threaded" => mc.runThreaded
-                case "threadless" => mc.runThreadless
-                case "akka" => mc.runAkka
-                case _ => usage
-            }
+        case Array(IntStr(numRings), IntStr(ringSize), IntStr(initToken), IntStr(reps)) => {
+            val numMessages = numRings + (numRings * reps)
+            val initMsg = Init(ringSize, initToken, reps)
+            val system = ActorSystem();
+            val s = system.actorOf(Props(new Supervisor(numMessages)))
+            s ! initMsg
+            global_latch.await
+            system.shutdown
+            System.exit(0)
         }
         case _ => usage
     }
