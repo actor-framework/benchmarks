@@ -1,13 +1,16 @@
 cmake_minimum_required (VERSION 2.8.6)
 project (benchmarks)
 
+set (CMAKE_CXX_FLAGS_RELEASE "-O3")
+set (CMAKE_BUILD_TYPE RELEASE)
+
 if (    "${DISABLED_BENCHMARKS}" MATCHES "cppa"
     AND "${DISABLED_BENCHMARKS}" MATCHES "theron")
 else ()
   # check if the user provided CXXFLAGS on the command line
   if ("${CMAKE_CXX_FLAGS}" STREQUAL "")
     set (CXXFLAGS_PROVIDED false)
-    set (CMAKE_CXX_FLAGS "-std=c++11 -Wextra -Wall -pedantic -O3")
+    set (CMAKE_CXX_FLAGS "-std=c++11 -Wextra -Wall -pedantic")
   else ()
     set (CXXFLAGS_PROVIDED true)
   endif ()
