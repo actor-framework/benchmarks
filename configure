@@ -127,6 +127,9 @@ while [ $# -ne 0 ]; do
         --with-gcc=*)
             gcc=$optarg
             ;;
+        --with-theron=*)
+            append_cache_entry THERON_ROOT PATH $optarg
+            ;;
         --no-cppa)
             ExcludedBenchmarks="cppa_$ExcludedBenchmarks"
             ;;
