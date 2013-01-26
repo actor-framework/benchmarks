@@ -15,7 +15,7 @@ mixed_case="20 50 10000 5"
 actor_creation="20"
 mailbox_performance="20 1000000"
 
-for lang in "cppa" "scala" "erlang" ; do
+for lang in "cppa" "scala" "erlang" "go" ; do
     for bench in "actor_creation" "mailbox_performance" "mixed_case" ; do
         Args=${!bench}
         echo "$lang: $Impl $bench ..." >&2

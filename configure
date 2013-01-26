@@ -19,6 +19,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --no-cppa                   exclude benchmarks for libcppa
     --no-scala                  exclude benchmarks for Scala
     --no-erlang                 exclude benchmarks for Erlang
+    --no-go                     exclude benchmarks for Go
     --no-theron                 exclude benchmarks for Theron
 
   Compiler Options:
@@ -141,6 +142,9 @@ while [ $# -ne 0 ]; do
             ;;
         --no-erlang)
             ExcludedBenchmarks="erlang_$ExcludedBenchmarks"
+            ;;
+        --no-go)
+            ExcludedBenchmarks="golang_$ExcludedBenchmarks"
             ;;
         *)
             echo "Invalid option '$1'.  Try $0 --help to see available options."
