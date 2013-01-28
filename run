@@ -37,6 +37,9 @@ case "$impl" in
   theron)
     cmd="./theron_$bench $@"
     ;;
+  go)
+    cmd="./go/$bench $@"
+    ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"
     exit 1
