@@ -4,6 +4,8 @@ project (benchmarks)
 set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 set (CMAKE_BUILD_TYPE RELEASE)
 
+add_definitions (-DNDEBUG)
+
 if (    "${DISABLED_BENCHMARKS}" MATCHES "cppa"
     AND "${DISABLED_BENCHMARKS}" MATCHES "theron")
 else ()
