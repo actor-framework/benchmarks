@@ -15,10 +15,10 @@ case object Done
 case object MasterExited
 
 object global {
-    final val taskN: Long = 86028157l * 329545133
     final val factor1: Long = 86028157
     final val factor2: Long = 329545133
     final val factors = List(factor2,factor1)
+    final val taskN: Long = factor1 * factor2
     def checkFactors(f: List[Long]) {
         assert(f equals factors)
     }
