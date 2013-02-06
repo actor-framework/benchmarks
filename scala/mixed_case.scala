@@ -14,11 +14,11 @@ case class Factors(values: List[Long])
 case object Done
 case object MasterExited
 
-object global {
-    final val factor1: Long = 86028157
-    final val factor2: Long = 329545133
-    final val factors = List(factor2,factor1)
-    final val taskN: Long = factor1 * factor2
+object Global {
+    val factor1: Long = 86028157
+    val factor2: Long = 329545133
+    val factors = List(factor2, factor1)
+    val taskN: Long = factor1 * factor2
     def checkFactors(f: List[Long]) {
         assert(f equals factors)
     }
@@ -35,7 +35,7 @@ object global {
 
 class Worker(supervisor: ActorRef) extends Actor {
     def receive = {
-        case Calc(value) => supervisor ! Factors(global.factorize(value))
+        case Calc(value) => supervisor ! Factors(Global.factorize(value))
         case Done => context.stop(self)
     }
 }
@@ -59,7 +59,7 @@ class ChainMaster(supervisor: ActorRef, worker: ActorRef) extends Actor {
     def initialized(ringSize: Int, initialTokenValue: Int, repetitions: Int, next: ActorRef, iteration: Int): Receive = {
         case Token(0) =>
             if (iteration + 1 < repetitions) {
-                worker ! Calc(global.taskN)
+                worker ! Calc(Global.taskN)
                 val next = newRing(self, ringSize - 1)
                 next ! Token(initialTokenValue)
                 context.become(initialized(ringSize, initialTokenValue, repetitions, next, iteration + 1))
@@ -75,7 +75,7 @@ class ChainMaster(supervisor: ActorRef, worker: ActorRef) extends Actor {
 
     def receive = {
         case Init(rs, itv, rep) =>
-            worker ! Calc(global.taskN)
+            worker ! Calc(Global.taskN)
             val next = newRing(self, rs-1)
             next ! Token(itv)
             context.become(initialized(rs, itv, rep, next, 0))
@@ -92,7 +92,7 @@ class Supervisor(numMessages: Int) extends Actor {
         }
     }
     def receive = {
-        case Factors(f) => global.checkFactors(f); inc
+        case Factors(f) => Global.checkFactors(f); inc
         case MasterExited => inc
         case Init(numRings, iterations, repetitions) =>
             val initMsg = Init(numRings, iterations, repetitions)
