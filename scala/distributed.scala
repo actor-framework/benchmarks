@@ -25,10 +25,6 @@ case class SetParent(parent: ActorRef)
 
 case class AddPongTimeout(path: String, token: String)
 
-object global {
-    val latch = new java.util.concurrent.CountDownLatch(1)
-}
-
 case class Peer(path: String, channel: ActorRef)
 case class Peers(connected: List[Peer], pending: List[PendingPeer])
 case class PendingPeer(path: String, channel: ActorRef, client: ActorRef, clientToken: String)
@@ -137,7 +133,7 @@ class ClientActor(system: ActorSystem) extends Actor {
         case Done => {
 //println("Done")
             if (left == 1) {
-                global.latch.countDown
+                global_latch.countDown
                 context.stop(self)
             } else {
                 become(collectDoneMessages(left - 1))
@@ -163,13 +159,13 @@ class ClientActor(system: ActorSystem) extends Actor {
         case TokenTimeout(token) => {
             if (!receivedTokens.contains(token)) {
                 println("Error: " + token + " did not reply within 10 seconds")
-                global.latch.countDown
+                global_latch.countDown
                 context.stop(self)
             }
         }
         case Error(what, token) => {
             println("Error [from " + token+ "]: " + what)
-            global.latch.countDown
+            global_latch.countDown
             context.stop(self)
         }
     }
@@ -222,7 +218,7 @@ object distributed {
         run(args, Nil, None, ((paths, x) => {
             val system = ActorSystem("benchmark", ConfigFactory.load.getConfig("benchmark"))
             system.actorOf(Props(new ClientActor(system))) ! RunClient(paths, x)
-            global.latch.await
+            global_latch.await
             system.shutdown
             System.exit(0)
         }))
