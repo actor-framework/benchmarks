@@ -63,6 +63,9 @@ else (CPPA_LIBRARY AND CPPA_INCLUDE)
       ../libcppa/build/lib
       ../../libcppa/build/lib
       ../../../libcppa/build/lib
+      ../libcppa/${CPPA_BUILD_DIR}/lib
+      ../../libcppa/${CPPA_BUILD_DIR}/lib
+      ../../../libcppa/${CPPA_BUILD_DIR}/lib
   )
 
   if (CPPA_LIBRARY) 
