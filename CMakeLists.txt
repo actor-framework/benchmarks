@@ -4,7 +4,10 @@ project (benchmarks)
 set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 set (CMAKE_BUILD_TYPE RELEASE)
 
+set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_definitions (-DNDEBUG)
+add_definitions (-DCPPA_OPENCL)
 
 if (    "${DISABLED_BENCHMARKS}" MATCHES "cppa"
     AND "${DISABLED_BENCHMARKS}" MATCHES "theron")
@@ -12,7 +15,7 @@ else ()
   # check if the user provided CXXFLAGS on the command line
   if ("${CMAKE_CXX_FLAGS}" STREQUAL "")
     set (CXXFLAGS_PROVIDED false)
-    set (CMAKE_CXX_FLAGS "-std=c++11 -Wextra -Wall -pedantic")
+    set (CMAKE_CXX_FLAGS "-std=c++11 -Wextra -Wall -pedantic ")
   else ()
     set (CXXFLAGS_PROVIDED true)
   endif ()
@@ -41,6 +44,17 @@ else ()
   else ()
     message (FATAL_ERROR "Your C++ compiler does not support C++11.")
   endif ()
+endif ()
+
+if ("${DISABLED_BENCHMARKS}" MATCHES "cppa")
+  # OpenCL only used by cppa benchmarks
+else ()
+  if (ENABLE_OPENCL)
+    find_package(OPENCL REQUIRED)
+    set(LD_FLAGS ${LD_FLAGS} ${OPENCL_LIBRARIES})
+    set(INCLUDE_DIRS ${INCLUDE_DIRS} ${OPENCL_INCLUDE_DIR})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPPA_OPENCL")
+  endif (ENABLE_OPENCL)
 endif ()
 
 set (CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)

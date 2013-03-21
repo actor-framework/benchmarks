@@ -19,3 +19,4 @@ scala/mailbox_performance.scala
 scala/matching.scala
 scala/mixed_case.scala
 scala/utility.scala
+cppa/matrix.cpp

@@ -12,7 +12,8 @@ include_directories(. .. ${CPPA_INCLUDE} ${Boost_INCLUDE_DIRS})
 
 macro(add_benchmark name)
   add_executable(${name} ${name}.cpp)
-  target_link_libraries(${name} ${CMAKE_DL_LIBS} ${CPPA_LIBRARY})
+  # LD_FLAGS set in main CMake file
+  target_link_libraries(${name} ${CMAKE_DL_LIBS} ${CPPA_LIBRARY} ${LD_FLAGS})
   add_dependencies(${name} all_benchmarks)
 endmacro()
 
@@ -21,3 +22,4 @@ add_benchmark(mailbox_performance)
 add_benchmark(mixed_case)
 add_benchmark(distributed)
 add_benchmark(matching)
+add_benchmark(matrix)

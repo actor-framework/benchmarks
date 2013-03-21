@@ -21,6 +21,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --no-erlang                 exclude benchmarks for Erlang
     --no-go                     exclude benchmarks for Go
     --no-theron                 exclude benchmarks for Theron
+    --with-opencl               build libcppa with OpenCL support
 
   Compiler Options:
     --with-clang=PATH           path to clang++ executable
@@ -130,6 +131,9 @@ while [ $# -ne 0 ]; do
             ;;
         --with-theron=*)
             append_cache_entry THERON_ROOT PATH $optarg
+            ;;
+        --with-opencl)
+            append_cache_entry ENABLE_OPENCL BOOL true
             ;;
         --no-cppa)
             ExcludedBenchmarks="cppa_$ExcludedBenchmarks"
