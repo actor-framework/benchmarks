@@ -40,7 +40,7 @@
 using namespace std;
 using namespace cppa;
 
-static constexpr size_t matrix_size = 2000;
+static constexpr size_t matrix_size = 1000;
 
 template<size_t Size>
 class square_matrix {
@@ -158,7 +158,7 @@ matrix_type async_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     futures.reserve(matrix_size * matrix_size);
     for (size_t row = 0; row < matrix_size; ++row) {
         for (size_t column = 0; column < matrix_size; ++column) {
-            futures.push_back(std::async([&,row,column] {
+            futures.push_back(std::async(std::launch::deferred, [&,row,column] {
                 result(row, column) = dot_product(lhs, rhs, row, column);
             }));
         }
@@ -172,7 +172,7 @@ matrix_type async_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
     vector<future<void>> futures;
     futures.reserve(matrix_size);
     for (size_t row = 0; row < matrix_size; ++row) {
-        futures.push_back(std::async([&,row] {
+        futures.push_back(std::async(std::launch::deferred, [&,row] {
             for (size_t column = 0; column < matrix_size; ++column) {
                 result(row, column) = dot_product(lhs, rhs, row, column);
             }
@@ -201,7 +201,6 @@ actor_ptr spawn_cl(const char* source, const char* fun_name, Ts&&... args) {
     return f(source, fun_name, std::forward<Ts>(args)...);
 }
 
-#ifdef CPPA_OPENCL
 matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     static constexpr const char* source = R"__(
         __kernel void multiply(__global float* lhs,
@@ -241,8 +240,6 @@ matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     );
     return result;
 }
-#else
-#endif
 
 int main(int argc, char** argv) {
 
