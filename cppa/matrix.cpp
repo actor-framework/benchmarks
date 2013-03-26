@@ -158,7 +158,7 @@ matrix_type async_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     futures.reserve(matrix_size * matrix_size);
     for (size_t row = 0; row < matrix_size; ++row) {
         for (size_t column = 0; column < matrix_size; ++column) {
-            futures.push_back(std::async(std::launch::deferred, [&,row,column] {
+            futures.push_back(std::async(std::launch::async, [&,row,column] {
                 result(row, column) = dot_product(lhs, rhs, row, column);
             }));
         }
@@ -172,7 +172,7 @@ matrix_type async_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
     vector<future<void>> futures;
     futures.reserve(matrix_size);
     for (size_t row = 0; row < matrix_size; ++row) {
-        futures.push_back(std::async(std::launch::deferred, [&,row] {
+        futures.push_back(std::async(std::launch::async, [&,row] {
             for (size_t column = 0; column < matrix_size; ++column) {
                 result(row, column) = dot_product(lhs, rhs, row, column);
             }
