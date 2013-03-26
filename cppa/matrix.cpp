@@ -40,36 +40,36 @@
 using namespace std;
 using namespace cppa;
 
-static constexpr size_t Dim = 4000;
+static constexpr size_t matrix_size = 2000;
 
-template<size_t Rows, size_t Columns = Rows>
-class matrix2d {
+template<size_t Size>
+class square_matrix {
 
  public:
 
-    matrix2d(matrix2d&&) = default;
-    matrix2d(const matrix2d&) = default;
-    matrix2d& operator=(matrix2d&&) = default;
-    matrix2d& operator=(const matrix2d&) = default;
+    static constexpr size_t num_elements = Size * Size;
 
-    matrix2d() {
-        m_data.resize(Rows*Columns);
+    square_matrix(square_matrix&&) = default;
+    square_matrix(const square_matrix&) = default;
+    square_matrix& operator=(square_matrix&&) = default;
+    square_matrix& operator=(const square_matrix&) = default;
+
+    square_matrix() {
+        m_data.resize(num_elements);
     }
 
-    matrix2d(vector<float> d) : m_data(std::move(d)) { }
+    square_matrix(vector<float> d) : m_data(std::move(d)) { }
 
-    matrix2d(const std::initializer_list<float>& args) : m_data(args) {
-        m_data.resize(Rows*Columns);
+    square_matrix(const std::initializer_list<float>& args) : m_data(args) {
+        m_data.resize(num_elements);
     }
 
     inline float& operator()(size_t row, size_t column) {
-        return m_data[row * Rows + column];
-        //return m_data[row][column];
+        return m_data[row * Size + column];
     }
 
     inline const float& operator()(size_t row, size_t column) const {
-        return m_data[row * Rows + column];
-        //return m_data[row][column];
+        return m_data[row * Size + column];
     }
 
     inline void zeroize() {
@@ -96,70 +96,87 @@ class matrix2d {
 
 };
 
-template<size_t R1, size_t C1, size_t R2, size_t C2>
-inline bool operator==(const matrix2d<R1,C1>& lhs, const matrix2d<R2,C2>& rhs) {
+template<size_t Size>
+inline bool operator==(const square_matrix<Size>& lhs, const square_matrix<Size>& rhs) {
     return std::equal(lhs.begin(), lhs.end(), rhs.begin());
 }
 
-template<size_t R1, size_t C1, size_t R2, size_t C2>
-inline bool operator!=(const matrix2d<R1,C1>& lhs, const matrix2d<R2,C2>& rhs) {
+template<size_t Size>
+inline bool operator!=(const square_matrix<Size>& lhs, const square_matrix<Size>& rhs) {
     return !(lhs == rhs);
 }
 
-using matrix_type = matrix2d<Dim>;
+using matrix_type = square_matrix<matrix_size>;
+
+float dot_product(const matrix_type& lhs, const matrix_type& rhs, size_t row, size_t column) {
+    float result = 0.0f;
+    for (size_t k = 0; k < matrix_size; ++k) {
+        result += lhs(row, k) * rhs(k, column);
+    }
+    return result;
+}
 
 matrix_type simple_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     matrix_type result;
-    result.zeroize();
-    for (size_t i = 0; i < Dim; ++i) {
-        for (size_t j = 0; j < Dim; ++j) {
-            for (size_t k = 0; k < Dim; ++k) {
-                result(i, j) += lhs(i, k) * rhs(k, j);
-            }
+    for (size_t row = 0; row < matrix_size; ++row) {
+        for (size_t column = 0; column < matrix_size; ++column) {
+            result(row, column) = dot_product(lhs, rhs, row, column);
         }
     }
     return std::move(result);
 }
 
 matrix_type actor_multiply(const matrix_type& lhs, const matrix_type& rhs) {
-    static constexpr size_t num_workers = Dim;//*Dim;
     matrix_type result;
-    actor_ptr master = self;
-    result.zeroize();
-    for (size_t i = 0; i < Dim; ++i) {
-        spawn([&,i,master] {
-            for (size_t j = 0; j < Dim; ++j) {
-                //spawn([&,i,j,master] {
-                    for (size_t k = 0; k < Dim; ++k) {
-                        result(i, j) += lhs(i, k) * rhs(k, j);
-                    }
-                //    send(master, atom("WorkerDone"));
-                //});
+    for (size_t row = 0; row < matrix_size; ++row) {
+        for (size_t column = 0; column < matrix_size; ++column) {
+            spawn<monitored>([&,row,column] {
+                result(row, column) = dot_product(lhs, rhs, row, column);
+            });
+        }
+    }
+    await_all_others_done();
+    return std::move(result);
+}
+
+matrix_type actor_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
+    matrix_type result;
+    for (size_t row = 0; row < matrix_size; ++row) {
+        spawn<monitored>([&,row] {
+            for (size_t column = 0; column < matrix_size; ++column) {
+                result(row, column) = dot_product(lhs, rhs, row, column);
             }
-            send(master, atom("WorkerDone"));
         });
     }
-    // await done messages from workers
-    size_t i = 0;
-    receive_for (i, num_workers) (on(atom("WorkerDone")) >> [] { });
+    await_all_others_done();
     return std::move(result);
 }
 
 matrix_type async_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     matrix_type result;
     vector<future<void>> futures;
-    futures.reserve(Dim);//*Dim);
-    result.zeroize();
-    for (size_t i = 0; i < Dim; ++i) {
-      futures.push_back(std::async([&,i] {
-        for (size_t j = 0; j < Dim; ++j) {
-            //futures.push_back(std::async([&,i,j] {
-                for (size_t k = 0; k < Dim; ++k) {
-                    result(i, j) += lhs(i, k) * rhs(k, j);
-                }
-            //}));
+    futures.reserve(matrix_size * matrix_size);
+    for (size_t row = 0; row < matrix_size; ++row) {
+        for (size_t column = 0; column < matrix_size; ++column) {
+            futures.push_back(std::async([&,row,column] {
+                result(row, column) = dot_product(lhs, rhs, row, column);
+            }));
         }
-      }));
+    }
+    for (auto& f : futures) f.wait();
+    return std::move(result);
+}
+
+matrix_type async_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
+    matrix_type result;
+    vector<future<void>> futures;
+    futures.reserve(matrix_size);
+    for (size_t row = 0; row < matrix_size; ++row) {
+        futures.push_back(std::async([&,row] {
+            for (size_t column = 0; column < matrix_size; ++column) {
+                result(row, column) = dot_product(lhs, rhs, row, column);
+            }
+        }));
     }
     for (auto& f : futures) f.wait();
     return std::move(result);
@@ -171,15 +188,15 @@ struct cl_spawn_helper;
 template<typename R, typename... Ts>
 struct cl_spawn_helper<R (Ts...)> {
     template<typename... Us>
-    actor_ptr operator()(const std::string& source, const std::string& fun_name, Us&&... args) {
-        opencl::program p{source};
+    actor_ptr operator()(const char* source, const char* fun_name, Us&&... args) {
+        auto p = opencl::program::create(source);
         auto cd = opencl::get_command_dispatcher();
         return cd->spawn<R, Ts...>(p, fun_name, std::forward<Us>(args)...);
     }
 };
 
 template<typename Signature, typename... Ts>
-actor_ptr spawn_cl(const std::string& source, const std::string& fun_name, Ts&&... args) {
+actor_ptr spawn_cl(const char* source, const char* fun_name, Ts&&... args) {
     cl_spawn_helper<Signature> f;
     return f(source, fun_name, std::forward<Ts>(args)...);
 }
@@ -187,24 +204,36 @@ actor_ptr spawn_cl(const std::string& source, const std::string& fun_name, Ts&&.
 #ifdef CPPA_OPENCL
 matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     static constexpr const char* source = R"__(
-        __kernel void mmultiply(__global float* matrix1,
-                                __global float* matrix2,
-                                __global float* output) {
-            int size = 4000;
-            int x = get_global_id(0);
-            int y = get_global_id(1);
-            int idx = 0;
-            float result = 0;
-            while (idx < size) {
-                result += matrix1[idx+y*size] * matrix2[x+idx*size];
-                ++idx;
+        __kernel void multiply(__global float* lhs,
+                               __global float* rhs,
+                               __global float* result) {
+            size_t size = get_global_size(0); // rows == columns
+            size_t row = get_global_id(0);
+            size_t column = get_global_id(1);
+            float dot_product = 0;
+            for (size_t k = 0; k < size; ++k) {
+                dot_product += lhs[k + column * size] * rhs[row + k * size];
             }
-            output[x+y*size] = result;
+            result[row + column * size] = dot_product;
         }
     )__";
     matrix_type result;
-    auto worker = spawn_cl<vector<float> (vector<float>, vector<float>)>(source, "mmultiply", Dim, Dim);
-    send(worker, lhs.data(), rhs.data());
+    auto worker = spawn_cl<vector<float> (const vector<float>&, const vector<float>&)>(source, "multiply", matrix_size, matrix_size);
+    /*
+    auto worker = spawn_cl<vector<float> (vector<float>, vector<float>)>(source, "multiply", matrix_size, matrix_size,
+        [](const std::function<void (vector<float>, vector<float>)>& enqueue) -> partial_function {
+            return (
+                on_arg_match >> [fptr](const matrix_type& lhs, const matrix_type& rhs) {
+                    enqueue(fptr(lhs.data(), rhs.data()));
+                }
+            );
+        },
+        [](const response_handle& handle, const vector<float>& result) {
+            reply_to(handle, result);
+        }
+   );
+   */
+   send(worker, lhs.data(), rhs.data());
     receive(
         on_arg_match >> [&](std::vector<float>& res_vec) {
             result = std::move(res_vec);
@@ -234,21 +263,12 @@ int main(int argc, char** argv) {
     match(make_any_tuple(argv[1], std::move(a), std::move(b))) (
         on("--simple", arg_match) >> simple_multiply,
         on("--actor", arg_match) >> actor_multiply,
+        on("--actor2", arg_match) >> actor_multiply2,
         on("--async", arg_match) >> async_multiply,
+        on("--async2", arg_match) >> async_multiply2,
         on("--opencl", arg_match) >> opencl_multiply,
         others() >> [] { cerr << "invalid arguments" << endl; }
     );
 
-    return 0;
-
-    /*
-    cout << "matrix c:" << endl;
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < columns; ++j) {
-            cout << c(i, j) << ' ';
-        }
-        cout << endl;
-    }
-    */
     return 0;
 }
