@@ -32,7 +32,7 @@ case "$impl" in
     cmd="scala org.libcppa.$bench $@"
     ;;
   erlang)
-    cmd="erl -noshell -noinput +P 20000000 -smp $NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
+    cmd="erl -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
     ;;
   theron)
     cmd="./theron_$bench $@"
