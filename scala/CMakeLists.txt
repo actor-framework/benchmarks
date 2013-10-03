@@ -21,7 +21,6 @@ add_scala_file("utility")
 add_scala_file("actor_creation" "${Utility_CLS}")
 add_scala_file("distributed" "${Utility_CLS}")
 add_scala_file("mailbox_performance" "${Utility_CLS}")
-add_scala_file("mailbox_performance_old" "${Utility_CLS}")
 add_scala_file("matching" "${Utility_CLS}")
 add_scala_file("mixed_case" "${Utility_CLS}")
 
