@@ -35,7 +35,7 @@
 #include <iostream>
 
 #include "cppa/cppa.hpp"
-#include "cppa/opencl/command_dispatcher.hpp"
+#include "cppa/opencl.hpp"
 
 using namespace std;
 using namespace cppa;
@@ -182,25 +182,7 @@ matrix_type async_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
     return std::move(result);
 }
 
-template<typename Signature>
-struct cl_spawn_helper;
-
-template<typename R, typename... Ts>
-struct cl_spawn_helper<R (Ts...)> {
-    template<typename... Us>
-    actor_ptr operator()(const char* source, const char* fun_name, Us&&... args) {
-        auto p = opencl::program::create(source);
-        auto cd = opencl::get_command_dispatcher();
-        return cd->spawn<R, Ts...>(p, fun_name, std::forward<Us>(args)...);
-    }
-};
-
-template<typename Signature, typename... Ts>
-actor_ptr spawn_cl(const char* source, const char* fun_name, Ts&&... args) {
-    cl_spawn_helper<Signature> f;
-    return f(source, fun_name, std::forward<Ts>(args)...);
-}
-
+#ifdef ENABLE_OPENCL
 matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     static constexpr const char* source = R"__(
         __kernel void multiply(__global float* lhs,
@@ -218,20 +200,6 @@ matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     )__";
     matrix_type result;
     auto worker = spawn_cl<vector<float> (const vector<float>&, const vector<float>&)>(source, "multiply", matrix_size, matrix_size);
-    /*
-    auto worker = spawn_cl<vector<float> (vector<float>, vector<float>)>(source, "multiply", matrix_size, matrix_size,
-        [](const std::function<void (vector<float>, vector<float>)>& enqueue) -> partial_function {
-            return (
-                on_arg_match >> [fptr](const matrix_type& lhs, const matrix_type& rhs) {
-                    enqueue(fptr(lhs.data(), rhs.data()));
-                }
-            );
-        },
-        [](const response_handle& handle, const vector<float>& result) {
-            reply_to(handle, result);
-        }
-   );
-   */
    send(worker, lhs.data(), rhs.data());
     receive(
         on_arg_match >> [&](std::vector<float>& res_vec) {
@@ -240,6 +208,11 @@ matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
     );
     return result;
 }
+#else
+matrix_type opencl_multiply(const matrix_type&, const matrix_type&) {
+    throw std::logic_error("Compiled w/o OpenCL");
+}
+#endif
 
 int main(int argc, char** argv) {
 

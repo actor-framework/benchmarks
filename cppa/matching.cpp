@@ -40,6 +40,8 @@
 
 #include "cppa/cppa.hpp"
 
+#include "cppa/detail/object_array.hpp"
+
 using namespace std;
 using namespace cppa;
 
@@ -49,7 +51,7 @@ void usage() {
 
 enum impl_type { cow_tuples, obj_arrays };
 
-option<impl_type> implproj(const string& str) {
+optional<impl_type> implproj(const string& str) {
     if (str == "cow_tuple") return cow_tuples;
     else if (str == "object_array") return obj_arrays;
     return {};

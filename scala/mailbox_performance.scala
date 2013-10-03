@@ -6,6 +6,7 @@ import akka.actor._
 import scala.annotation.tailrec
 
 case object Msg
+case object RunSender
 
 class Receiver(n: Long) extends Actor {
     var received: Long = 0
@@ -19,6 +20,13 @@ class Receiver(n: Long) extends Actor {
     }
 }
 
+class Sender(msgs: Int, testee: ActorRef) extends Actor {
+    def receive = {
+        case RunSender =>
+            for (_ <- 0 until msgs) testee ! Msg
+    }
+}
+
 object mailbox_performance {
     def usage() {
         Console println "usage: (num_threads) (msgs_per_thread)"
@@ -28,9 +36,10 @@ object mailbox_performance {
             val system = ActorSystem()
             val testee = system.actorOf(Props(new Receiver(threads*msgs)))
             for (_ <- 0 until threads) {
-                (new Thread {
-                    override def run() { for (_ <- 0 until msgs) testee ! Msg }
-                }).start
+                system.actorOf(Props(new Sender(msgs, testee))) ! RunSender
+                //(new Thread {
+                //    override def run() { for (_ <- 0 until msgs) testee ! Msg }
+                //}).start
             }
             global_latch.await
             system.shutdown

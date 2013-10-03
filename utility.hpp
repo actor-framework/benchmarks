@@ -76,10 +76,10 @@ std::vector<uint64_t> factorize(uint64_t n) {
 // some utility for cppa benchmarks only
 #ifndef THERON_BENCHMARK
 
-#include "cppa/option.hpp"
+#include "cppa/optional.hpp"
 // a string => T projection
 template<typename T>
-cppa::option<T> spro(const std::string& str) {
+cppa::optional<T> spro(const std::string& str) {
     T value;
     if (std::istringstream(str) >> value) {
         return value;

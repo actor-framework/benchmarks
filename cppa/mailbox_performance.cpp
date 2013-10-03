@@ -28,7 +28,6 @@
 \******************************************************************************/
 
 
-#include <thread>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -84,6 +83,10 @@ void run(impl_type impl, uint64_t num_sender, uint64_t num_msgs) {
     auto total = num_sender * num_msgs;
     auto testee = (impl == stacked) ? spawn(receiver, total)
                                     : spawn<fsm_receiver>(total);
+    for (uint64_t i = 0; i < num_sender; ++i) {
+        spawn(sender, testee, num_msgs);
+    }
+    /*
     vector<thread> senders;
     for (uint64_t i = 0; i < num_sender; ++i) {
         senders.emplace_back(sender, testee, num_msgs);
@@ -91,6 +94,7 @@ void run(impl_type impl, uint64_t num_sender, uint64_t num_msgs) {
     for (auto& s : senders) {
         s.join();
     }
+    */
 }
 
 int main(int argc, char** argv) {
