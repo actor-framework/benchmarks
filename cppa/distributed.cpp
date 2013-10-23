@@ -32,9 +32,6 @@
 #include <utility>
 #include <iostream>
 
-#include <boost/timer.hpp>
-#include <boost/progress.hpp>
-
 #include "utility.hpp"
 
 #include "cppa/cppa.hpp"
@@ -109,7 +106,7 @@ struct ping_actor : sb_actor<ping_actor> {
                         quit();
                     },
                     on(atom("pong"), arg_match) >> [=](uint32_t value) {
-                        reply(atom("ping"), value - 1);
+                        return make_cow_tuple(atom("ping"), value - 1);
                     },
                     others() >> [=] {
                         cout << "ping_actor: unexpected: "
@@ -139,9 +136,9 @@ struct server_actor : sb_actor<server_actor> {
         trap_exit(true);
         init_state = (
             on(atom("ping"), arg_match) >> [=](uint32_t value) {
-                reply(atom("pong"), value);
+                return make_cow_tuple(atom("pong"), value);
             },
-            on(atom("add_pong"), arg_match) >> [=](const string& host, uint16_t port) {
+            on(atom("add_pong"), arg_match) >> [=](const string& host, uint16_t port) -> any_tuple {
                 auto key = make_pair(host, port);
                 auto i = m_pongs.find(key);
                 if (i == m_pongs.end()) {
@@ -149,14 +146,14 @@ struct server_actor : sb_actor<server_actor> {
                         auto p = remote_actor(host.c_str(), port);
                         link_to(p);
                         m_pongs.insert(make_pair(key, p));
-                        reply(atom("ok"));
+                        return atom("ok");
                     }
                     catch (exception& e) {
-                        reply(atom("error"), e.what());
+                        return make_cow_tuple(atom("error"), e.what());
                     }
                 }
                 else {
-                    reply(atom("ok"));
+                    return atom("ok");
                 }
             },
             on(atom("kickoff"), arg_match) >> [=](uint32_t num_pings) {

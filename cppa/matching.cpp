@@ -79,35 +79,38 @@ int main(int argc, char** argv) {
                 m6 = make_cow_tuple(atom("msg6"), 0, 0.0, "0");
             }
             else {
+                auto to_any_tuple = [](detail::object_array* ptr) {
+                    return any_tuple(static_cast<any_tuple::raw_ptr>(ptr));
+                };
                 auto m1o = new detail::object_array;
                 m1o->push_back(object::from(atom("msg1")));
                 m1o->push_back(object::from(0));
-                m1 = any_tuple{m1o};
+                m1 = to_any_tuple(m1o);
                 auto m2o = new detail::object_array;
                 m2o->push_back(object::from(atom("msg2")));
                 m2o->push_back(object::from(0.0));
-                m2 = any_tuple{m2o};
+                m2 = to_any_tuple(m2o);
                 auto m3o = new detail::object_array;
                 m3o->push_back(object::from(atom("msg3")));
                 m3o->push_back(object::from(list<int>{0}));
-                m3 = any_tuple{m3o};
+                m3 = to_any_tuple(m3o);
                 auto m4o = new detail::object_array;
                 m4o->push_back(object::from(atom("msg4")));
                 m4o->push_back(object::from(0));
                 m4o->push_back(object::from(std::string("0")));
-                m4 = any_tuple{m4o};
+                m4 = to_any_tuple(m4o);
                 auto m5o = new detail::object_array;
                 m5o->push_back(object::from(atom("msg5")));
                 m5o->push_back(object::from(0));
                 m5o->push_back(object::from(0));
                 m5o->push_back(object::from(0));
-                m5 = any_tuple{m5o};
+                m5 = to_any_tuple(m5o);
                 auto m6o = new detail::object_array;
                 m6o->push_back(object::from(atom("msg6")));
                 m6o->push_back(object::from(0));
                 m6o->push_back(object::from(0.0));
                 m6o->push_back(object::from(std::string("0")));
-                m6 = any_tuple{m6o};
+                m6 = to_any_tuple(m6o);
             }
             int64_t m1matched = 0;
             int64_t m2matched = 0;
