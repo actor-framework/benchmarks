@@ -136,6 +136,9 @@ while [ $# -ne 0 ]; do
         --with-opencl)
             append_cache_entry ENABLE_OPENCL BOOL true
             ;;
+        --with-scalac=*)
+            append_cache_entry SCALAC STRING $optarg
+            ;;
         --no-cppa)
             ExcludedFeatures="cppa_$ExcludedFeatures"
             ;;
