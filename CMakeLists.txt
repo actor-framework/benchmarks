@@ -9,8 +9,8 @@ set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions (-DNDEBUG)
 add_definitions (-DCPPA_OPENCL)
 
-if (    "${DISABLED_BENCHMARKS}" MATCHES "cppa"
-    AND "${DISABLED_BENCHMARKS}" MATCHES "theron")
+if (    "${DISABLED_FEATURES}" MATCHES "cppa"
+    AND "${DISABLED_FEATURES}" MATCHES "theron")
 else ()
   # check if the user provided CXXFLAGS on the command line
   if ("${CMAKE_CXX_FLAGS}" STREQUAL "")
@@ -46,7 +46,7 @@ else ()
   endif ()
 endif ()
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "cppa")
+if ("${DISABLED_FEATURES}" MATCHES "cppa")
   # OpenCL only used by cppa benchmarks
 else ()
   if (ENABLE_OPENCL)
@@ -66,13 +66,13 @@ add_custom_target(benchmark_target ALL)
 include_directories("${PROJECT_INCLUDE_DIR}")
 include_directories("${PROJECT_SOURCE_DIR}")
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "cppa")
+if ("${DISABLED_FEATURES}" MATCHES "cppa")
   message (STATUS "skip libcppa benchmarks (disabled)")
 else ()
   add_subdirectory(cppa)
 endif ()
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "theron")
+if ("${DISABLED_FEATURES}" MATCHES "theron")
   message (STATUS "skip Theron benchmarks (disabled)")
 else ()
   add_subdirectory(theron)
@@ -80,7 +80,7 @@ else ()
 endif ()
 
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "scala")
+if ("${DISABLED_FEATURES}" MATCHES "scala")
   message (STATUS "skip Scala benchmarks (disabled)")
 else ()
   # check for scalac and version
@@ -105,16 +105,23 @@ else ()
   add_dependencies(benchmark_target scalabench)
 endif ()
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "erlang")
+if ("${DISABLED_FEATURES}" MATCHES "erlang")
   message (STATUS "skip Erlang benchmarks (disabled)")
 else()
   add_subdirectory(erlang)
   add_dependencies(benchmark_target erlangbench)
 endif ()
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "golang")
+if ("${DISABLED_FEATURES}" MATCHES "golang")
   message (STATUS "skip Go benchmarks (disabled)")
 else()
   add_subdirectory(go)
   add_dependencies(benchmark_target gobench)
+endif ()
+
+if ("${DISABLED_BENCHMARKS}" MATCHES "tools")
+  message (STATUS "skip tools (disabled)")
+else ()
+  add_subdirectory(tools)
+  add_dependencies(benchmark_target all_tools)
 endif ()

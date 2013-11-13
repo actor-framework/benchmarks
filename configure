@@ -21,6 +21,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --no-erlang                 exclude benchmarks for Erlang
     --no-go                     exclude benchmarks for Go
     --no-theron                 exclude benchmarks for Theron
+    --no-tools                  exclude evaluation tools
     --with-opencl               build libcppa with OpenCL support
 
   Compiler Options:
@@ -102,7 +103,7 @@ configure ()
 }
 
 # Set defaults.
-ExcludedBenchmarks=""
+ExcludedFeatures=""
 builddir="$sourcedir/build"
 CMakeCacheEntries=""
 append_cache_entry CMAKE_BUILD_TYPE            STRING RelWithDebInfo
@@ -136,19 +137,22 @@ while [ $# -ne 0 ]; do
             append_cache_entry ENABLE_OPENCL BOOL true
             ;;
         --no-cppa)
-            ExcludedBenchmarks="cppa_$ExcludedBenchmarks"
+            ExcludedFeatures="cppa_$ExcludedFeatures"
             ;;
         --no-theron)
-            ExcludedBenchmarks="theron_$ExcludedBenchmarks"
+            ExcludedFeatures="theron_$ExcludedFeatures"
             ;;
         --no-scala)
-            ExcludedBenchmarks="scala_$ExcludedBenchmarks"
+            ExcludedFeatures="scala_$ExcludedFeatures"
             ;;
         --no-erlang)
-            ExcludedBenchmarks="erlang_$ExcludedBenchmarks"
+            ExcludedFeatures="erlang_$ExcludedFeatures"
             ;;
         --no-go)
-            ExcludedBenchmarks="golang_$ExcludedBenchmarks"
+            ExcludedFeatures="golang_$ExcludedFeatures"
+            ;;
+        --no-tools)
+            ExcludedFeatures="tools_$ExcludedFeatures"
             ;;
         *)
             echo "Invalid option '$1'.  Try $0 --help to see available options."
@@ -158,7 +162,7 @@ while [ $# -ne 0 ]; do
     shift
 done
 
-append_cache_entry DISABLED_BENCHMARKS STRING "$ExcludedBenchmarks"
+append_cache_entry DISABLED_FEATURES STRING "$ExcludedFeatures"
 
 # At this point we save the global CMake variables so that configure() can
 # later use them.

@@ -89,15 +89,15 @@ int main(int argc, char** argv) {
                 output_table[num_cores][lang] = make_pair(stats.mean, stats.conf_interval_95);
             }
         }
-        cout << benchmark << ".txt" << endl;
-        cout << file_header << endl;
+        ofstream oss{benchmark + ".dat"};
+        oss << file_header << endl;
         for (auto& output_kvp : output_table) {
-            cout << output_kvp.first; // number of cores
+            oss << output_kvp.first; // number of cores
             for (auto& inner_kvp : output_kvp.second) {
-                cout << " " << inner_kvp.second.first   // mean
+                oss << " " << inner_kvp.second.first   // mean
                      << " " << inner_kvp.second.second; // 95% confidence interval
             }
-            cout << endl;
+            oss << endl;
         }
     }
 }
