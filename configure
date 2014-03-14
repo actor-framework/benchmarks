@@ -35,6 +35,9 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --with-boost=PATH           path to Boost install root
     --with-theron=PATH          path to Theron install root
 
+  Miscellaneous Options:
+    --with-cppa-log-level=LVL   sets the level of debug output
+
   Influential Environment Variables (only on first invocation
   per build directory):
     CXX                         C++ compiler command
@@ -138,6 +141,30 @@ while [ $# -ne 0 ]; do
             ;;
         --with-scalac=*)
             append_cache_entry SCALAC STRING $optarg
+            ;;
+        --with-cppa-log-level=*)
+            level=$(echo "$optarg" | tr '[:lower:]' '[:upper:]')
+            case $level in
+                ERROR)
+                    append_cache_entry CPPA_LOG_LEVEL STRING 0
+                    ;;
+                WARNING)
+                    append_cache_entry CPPA_LOG_LEVEL STRING 1
+                    ;;
+                INFO)
+                    append_cache_entry CPPA_LOG_LEVEL STRING 2
+                    ;;
+                DEBUG)
+                    append_cache_entry CPPA_LOG_LEVEL STRING 3
+                    ;;
+                TRACE)
+                    append_cache_entry CPPA_LOG_LEVEL STRING 4
+                    ;;
+                *)
+                    echo "Invalid log level '$level'. Try '$0 --help' to see valid values."
+                    exit 1
+                    ;;
+            esac
             ;;
         --no-cppa)
             ExcludedFeatures="cppa_$ExcludedFeatures"
