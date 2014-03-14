@@ -43,12 +43,9 @@ using namespace cppa;
 
 typedef vector<uint64_t> factors;
 
-constexpr uint64_t s_task_n = uint64_t(86028157)*329545133;
-
-#ifdef NDEBUG
 constexpr uint64_t s_factor1 = 86028157;
 constexpr uint64_t s_factor2 = 329545133;
-#endif
+constexpr uint64_t s_task_n = s_factor1 * s_factor2;
 
 void check_factors(const factors& vec) {
     assert(vec.size() == 2);
