@@ -54,19 +54,20 @@ struct fsm_receiver : sb_actor<fsm_receiver> {
     }
 };
 
-void receiver(uint64_t max) {
+void receiver(blocking_actor* self, uint64_t max) {
     uint64_t value;
-    receive_while (gref(value) < max) (
+    self->receive_while (gref(value) < max) (
         on(atom("msg")) >> [&] {
             ++value;
         }
     );
 }
 
-void sender(actor_ptr whom, uint64_t count) {
+void sender(actor whom, uint64_t count) {
+    if (!whom) return;
     any_tuple msg = make_cow_tuple(atom("msg"));
     for (uint64_t i = 0; i < count; ++i) {
-        whom->enqueue(nullptr, msg);
+        anon_send_tuple(whom, msg);
     }
 }
 
@@ -81,7 +82,7 @@ enum impl_type { stacked, event_based };
 
 void run(impl_type impl, uint64_t num_sender, uint64_t num_msgs) {
     auto total = num_sender * num_msgs;
-    auto testee = (impl == stacked) ? spawn(receiver, total)
+    auto testee = (impl == stacked) ? spawn<blocking_api>(receiver, total)
                                     : spawn<fsm_receiver>(total);
     for (uint64_t i = 0; i < num_sender; ++i) {
         spawn(sender, testee, num_msgs);
@@ -110,7 +111,7 @@ int main(int argc, char** argv) {
         on(spro<uint64_t>, spro<uint64_t>) >> f,
         others() >> usage
     );
-    await_all_others_done();
+    await_all_actors_done();
     shutdown();
     return 0;
 }

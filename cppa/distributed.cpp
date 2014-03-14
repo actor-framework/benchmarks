@@ -66,39 +66,14 @@ void usage() {
     exit(0);
 }
 
-template<class MatchExpr>
-class actor_template {
-
-    MatchExpr m_expr;
-
- public:
-
-    actor_template(MatchExpr me) : m_expr(move(me)) { }
-
-    actor_ptr spawn() const {
-        struct impl : sb_actor<impl> {
-            behavior init_state;
-            impl(const MatchExpr& mx) : init_state(mx.as_partial_function()) {
-            }
-        };
-        return cppa::spawn(new impl{m_expr});
-    }
-
-};
-
-template<typename... Args>
-auto actor_prototype(const Args&... args) -> actor_template<decltype(mexpr_concat(args...))> {
-    return {mexpr_concat(args...)};
-}
-
 struct ping_actor : sb_actor<ping_actor> {
 
     behavior init_state;
-    actor_ptr parent;
+    actor parent;
 
-    ping_actor(actor_ptr parent_ptr) : parent(move(parent_ptr)) {
+    ping_actor(actor parent_ptr) : parent(move(parent_ptr)) {
         init_state = (
-            on(atom("kickoff"), arg_match) >> [=](actor_ptr pong, uint32_t value) {
+            on(atom("kickoff"), arg_match) >> [=](actor pong, uint32_t value) {
                 send(pong, atom("ping"), value);
                 become (
                     on(atom("pong"), uint32_t(0)) >> [=] {
@@ -127,7 +102,7 @@ struct ping_actor : sb_actor<ping_actor> {
 
 struct server_actor : sb_actor<server_actor> {
 
-    typedef map<pair<string, uint16_t>, actor_ptr> pong_map;
+    typedef map<pair<string, uint16_t>, actor> pong_map;
 
     behavior init_state;
     pong_map m_pongs;
@@ -146,19 +121,19 @@ struct server_actor : sb_actor<server_actor> {
                         auto p = remote_actor(host.c_str(), port);
                         link_to(p);
                         m_pongs.insert(make_pair(key, p));
-                        return atom("ok");
+                        return make_any_tuple(atom("ok"));
                     }
                     catch (exception& e) {
-                        return make_cow_tuple(atom("error"), e.what());
+                        return make_any_tuple(atom("error"), e.what());
                     }
                 }
                 else {
-                    return atom("ok");
+                    return make_any_tuple(atom("ok"));
                 }
             },
-            on(atom("kickoff"), arg_match) >> [=](uint32_t num_pings) {
+            on(atom("kickoff"), arg_match) >> [=](uint32_t num_pings, actor buddy) {
                 for (auto& kvp : m_pongs) {
-                    auto ping = spawn<ping_actor>(last_sender());
+                    auto ping = spawn<ping_actor>(buddy);
                     send(ping, atom("kickoff"), kvp.second, num_pings);
                 }
             },
@@ -166,7 +141,7 @@ struct server_actor : sb_actor<server_actor> {
                 m_pongs.clear();
             },
             on<atom("EXIT"), uint32_t>() >> [=] {
-                actor_ptr who = last_sender();
+                auto who = last_sender();
                 auto i = find_if(m_pongs.begin(), m_pongs.end(),
                                       [&](const pong_map::value_type& kvp) {
                     return kvp.second == who;
@@ -254,34 +229,36 @@ void client_mode(Iterator first, Iterator last) {
         cout << "less than two nodes given" << endl;
         exit(1);
     }
-    vector<actor_ptr> remote_actors;
+    vector<actor> remote_actors;
     for (auto& r : remotes) {
         remote_actors.push_back(remote_actor(r.first.c_str(), r.second));
     }
     // setup phase
+    scoped_actor self;
     //cout << "tell server nodes to connect to each other" << endl;
     for (size_t i = 0; i < remotes.size(); ++i) {
         for (size_t j = 0; j < remotes.size(); ++j) {
             if (i != j) {
                 auto& r = remotes[j];
-                send(remote_actors[i], atom("add_pong"), r.first, r.second);
+                self->send(remote_actors[i], atom("add_pong"), r.first, r.second);
             }
         }
     }
     { // collect {ok} messages
         size_t i = 0;
         size_t end = remote_actors.size() * (remote_actors.size() - 1);
-        receive_for(i, end) (
+        self->receive_for(i, end) (
             on(atom("ok")) >> [] {
+                // nothing to do
             },
             on(atom("error"), arg_match) >> [&](const string& str) {
                 cout << "error: " << str << endl;
                 for (auto& x : remote_actors) {
-                    send(x, atom("purge"));
+                    self->send(x, atom("purge"));
                 }
                 throw logic_error("");
             },
-            others() >> [] {
+            others() >> [&] {
                 cout << "expected {ok|error}, received: "
                      << to_string(self->last_dequeued())
                      << endl;
@@ -290,7 +267,7 @@ void client_mode(Iterator first, Iterator last) {
             after(chrono::seconds(10)) >> [&] {
                 cout << "remote didn't answer within 10sec." << endl;
                 for (auto& x : remote_actors) {
-                    send(x, atom("purge"));
+                    self->send(x, atom("purge"));
                 }
                 throw logic_error("");
             }
@@ -300,17 +277,18 @@ void client_mode(Iterator first, Iterator last) {
     //cout << "setup done" << endl;
     //cout << "kickoff, init value = " << init_value << endl;
     for (auto& r : remote_actors) {
-        send(r, atom("kickoff"), init_value);
+        self->send(r, atom("kickoff"), init_value, self);
     }
     { // collect {done} messages
         size_t i = 0;
         size_t end = remote_actors.size() * (remote_actors.size() - 1);
-        receive_for(i, end) (
+        self->receive_for(i, end) (
             on(atom("done")) >> [] {
                 //cout << "...done..." << endl;
             },
-            others() >> [] {
-                cout << "unexpected: " << to_string(self->last_dequeued()) << endl;
+            others() >> [&] {
+                cout << "unexpected: "
+                     << to_string(self->last_dequeued()) << endl;
                 throw logic_error("");
             }
         );
@@ -328,12 +306,13 @@ void shutdown_mode(Iterator first, Iterator last) {
             remotes.emplace_back(move(host), static_cast<uint16_t>(port));
         }
     );
+    scoped_actor self;
     for (auto& r : remotes) {
         try {
-            actor_ptr x = remote_actor(r.first, r.second);
+            actor x = remote_actor(r.first, r.second);
             self->monitor(x);
-            send(x, atom("shutdown"));
-            receive (
+            self->send(x, atom("shutdown"));
+            self->receive (
                 on(atom("DOWN"), val<uint32_t>) >> [] {
                     // ok, done
                 },
@@ -362,7 +341,6 @@ int main(int argc, char** argv) {
         },
         on("mode=benchmark") >> [=] {
             client_mode(first + 1, last);
-            await_all_others_done();
         },
         on("mode=shutdown") >> [=] {
             shutdown_mode(first + 1, last);
@@ -374,6 +352,6 @@ int main(int argc, char** argv) {
             usage("unknown argument: ", *first);
         }
     );
-    await_all_others_done();
+    await_all_actors_done();
     shutdown();
 }

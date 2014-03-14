@@ -42,7 +42,7 @@ using namespace cppa;
 
 struct testee : sb_actor<testee> {
     behavior init_state;
-    testee(const actor_ptr& parent) {
+    testee(const actor& parent) {
         init_state = (
             on(atom("spread"), (uint32_t) 0) >> [=]() {
                 send(parent, atom("result"), (uint32_t) 1);
@@ -50,8 +50,8 @@ struct testee : sb_actor<testee> {
             },
             on(atom("spread"), arg_match) >> [=](uint32_t x) {
                 any_tuple msg = make_cow_tuple(atom("spread"), x - 1);
-                spawn<testee>(this) << msg;
-                spawn<testee>(this) << msg;
+                send_tuple(spawn<testee>(this), msg);
+                send_tuple(spawn<testee>(this), msg);
                 become (
                     on(atom("result"), arg_match) >> [=](uint32_t r1) {
                         become (
@@ -67,20 +67,22 @@ struct testee : sb_actor<testee> {
     }
 };
 
-void stacked_testee(actor_ptr parent) {
-    receive (
+void stacked_testee(blocking_actor* self, actor parent) {
+    self->receive (
         on(atom("spread"), (uint32_t) 0) >> [&]() {
-            send(parent, atom("result"), (uint32_t) 1);
+            self->send(parent, atom("result"), (uint32_t) 1);
         },
         on(atom("spread"), arg_match) >> [&](uint32_t x) {
+            auto child1 = self->spawn<blocking_api>(stacked_testee, self);
+            auto child2 = self->spawn<blocking_api>(stacked_testee, self);
             any_tuple msg = make_cow_tuple(atom("spread"), x - 1);
-            spawn(stacked_testee, self) << msg;
-            spawn(stacked_testee, self) << msg;
-            receive (
+            self->send_tuple(child1, msg);
+            self->send_tuple(child2, msg);
+            self->receive (
                 on(atom("result"), arg_match) >> [&](uint32_t v1) {
-                    receive (
+                    self->receive (
                         on(atom("result"), arg_match) >> [&](uint32_t v2) {
-                            send(parent, atom("result"), v1 + v2);
+                            self->send(parent, atom("result"), v1 + v2);
                         }
                     );
                 }
@@ -99,14 +101,14 @@ int main(int argc, char** argv) {
     vector<string> args(argv + 1, argv + argc);
     match (args) (
         on("--stacked", spro<uint32_t>) >> [](uint32_t num) {
-            send(spawn(stacked_testee, self), atom("spread"), num);
+            anon_send(spawn<blocking_api>(stacked_testee, invalid_actor), atom("spread"), num);
         },
         on(spro<uint32_t>) >> [](uint32_t num) {
-            send(spawn<testee>(self), atom("spread"), num);
+            anon_send(spawn<testee>(invalid_actor), atom("spread"), num);
         },
         others() >> usage
     );
-    await_all_others_done();
+    await_all_actors_done();
     shutdown();
     return 0;
 }

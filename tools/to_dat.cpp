@@ -37,7 +37,7 @@ struct statistics  {
         variance = accumulate(data.begin(), data.end(), 0.0, variance_plus{mean}) / data.size();
         std_dev = sqrt(variance);
         // calculate confidence interval
-        students_t dist{data.size() - 1};
+        students_t dist{static_cast<double>(data.size() - 1)};
         // t-statistic for 95% confidence interval
         double tstat = quantile(complement(dist, 0.025 / 2));
         // width of confidence interval

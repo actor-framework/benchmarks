@@ -44,8 +44,11 @@ using namespace cppa;
 typedef vector<uint64_t> factors;
 
 constexpr uint64_t s_task_n = uint64_t(86028157)*329545133;
+
+#ifdef NDEBUG
 constexpr uint64_t s_factor1 = 86028157;
 constexpr uint64_t s_factor2 = 329545133;
+#endif
 
 void check_factors(const factors& vec) {
     assert(vec.size() == 2);
@@ -57,9 +60,9 @@ void check_factors(const factors& vec) {
 }
 
 struct fsm_worker : sb_actor<fsm_worker> {
-    actor_ptr mc;
+    actor mc;
     behavior init_state;
-    fsm_worker(const actor_ptr& msgcollector) : mc(msgcollector) {
+    fsm_worker(const actor& msgcollector) : mc(msgcollector) {
         init_state = (
             on<atom("calc"), uint64_t>() >> [=](uint64_t what) {
                 send(mc, atom("result"), factorize(what));
@@ -72,12 +75,12 @@ struct fsm_worker : sb_actor<fsm_worker> {
 };
 
 struct fsm_chain_link : sb_actor<fsm_chain_link> {
-    actor_ptr next;
+    actor next;
     behavior init_state;
-    fsm_chain_link(const actor_ptr& n) : next(n) {
+    fsm_chain_link(const actor& n) : next(n) {
         init_state = (
             on<atom("token"), int>() >> [=](int v) {
-                next << std::move(last_dequeued());
+                send_tuple(next, std::move(last_dequeued()));
                 if (v == 0) quit();
             }
         );
@@ -86,19 +89,19 @@ struct fsm_chain_link : sb_actor<fsm_chain_link> {
 
 struct fsm_chain_master : sb_actor<fsm_chain_master> {
     int iteration;
-    actor_ptr mc;
-    actor_ptr next;
-    actor_ptr worker;
+    actor mc;
+    actor next;
+    actor worker;
     behavior init_state;
     void new_ring(int ring_size, int initial_token_value) {
         send(worker, atom("calc"), s_task_n);
-        next = self;
+        next = this;
         for (int i = 1; i < ring_size; ++i) {
             next = spawn<fsm_chain_link>(next);
         }
         send(next, atom("token"), initial_token_value);
     }
-    fsm_chain_master(actor_ptr msgcollector) : iteration(0), mc(msgcollector) {
+    fsm_chain_master(actor msgcollector) : iteration(0), mc(msgcollector) {
         init_state = (
             on(atom("init"), arg_match) >> [=](int rs, int itv, int n) {
                 worker = spawn<fsm_worker>(msgcollector);
@@ -140,24 +143,24 @@ struct fsm_supervisor : sb_actor<fsm_supervisor> {
     }
 };
 
-void chain_link(actor_ptr next) {
+void chain_link(blocking_actor* self, actor next) {
     bool done = false;
-    do_receive (
+    self->do_receive (
         on<atom("token"), int>() >> [&](int v) {
             if (v == 0) {
                 done = true;
             }
-            next << std::move(self->last_dequeued());
+            self->send_tuple(next, std::move(self->last_dequeued()));
         }
     )
     .until([&]() { return done == true; });
 }
 
-void worker_fun(actor_ptr msgcollector) {
+void worker_fun(blocking_actor* self, actor msgcollector) {
     bool done = false;
-    do_receive (
+    self->do_receive (
         on<atom("calc"), uint64_t>() >> [&](uint64_t what) {
-            send(msgcollector, atom("result"), factorize(what));
+            self->send(msgcollector, atom("result"), factorize(what));
         },
         on(atom("done")) >> [&]() {
             done = true;
@@ -166,42 +169,42 @@ void worker_fun(actor_ptr msgcollector) {
     .until([&]() { return done == true; });
 }
 
-actor_ptr new_ring(actor_ptr next, int ring_size) {
-    for (int i = 1; i < ring_size; ++i) next = spawn(chain_link, next);
+actor new_ring(actor next, int ring_size) {
+    for (int i = 1; i < ring_size; ++i) next = spawn<blocking_api>(chain_link, next);
     return next;
 }
 
-void chain_master(actor_ptr msgcollector) {
-    auto worker = spawn(worker_fun, msgcollector);
-    receive (
+void chain_master(blocking_actor* self, actor msgcollector) {
+    auto worker = self->spawn<blocking_api>(worker_fun, msgcollector);
+    self->receive (
         on(atom("init"), arg_match) >> [&](int rs, int itv, int n) {
             int iteration = 0;
             auto next = new_ring(self, rs);
-            send(next, atom("token"), itv);
-            send(worker, atom("calc"), s_task_n);
-            do_receive (
+            self->send(next, atom("token"), itv);
+            self->send(worker, atom("calc"), s_task_n);
+            self->do_receive (
                 on<atom("token"), int>() >> [&](int v) {
                     if (v == 0) {
                         if (++iteration < n) {
                             next = new_ring(self, rs);
-                            send(next, atom("token"), itv);
-                            send(worker, atom("calc"), s_task_n);
+                            self->send(next, atom("token"), itv);
+                            self->send(worker, atom("calc"), s_task_n);
                         }
                     }
                     else {
-                        send(next, atom("token"), v - 1);
+                        self->send(next, atom("token"), v - 1);
                     }
                 }
             )
             .until([&]() { return iteration == n; });
         }
     );
-    send(msgcollector, atom("masterdone"));
-    send(worker, atom("done"));
+    self->send(msgcollector, atom("masterdone"));
+    self->send(worker, atom("done"));
 }
 
-void supervisor(int num_msgs) {
-    do_receive (
+void supervisor(blocking_actor* self, int num_msgs) {
+    self->do_receive (
         on(atom("masterdone")) >> [&]() {
             --num_msgs;
         },
@@ -217,18 +220,19 @@ template<typename F>
 void run_test(F spawn_impl,
               int num_rings, int ring_size,
               int initial_token_value, int repetitions) {
-    std::vector<actor_ptr> masters; // of the universe
+    std::vector<actor> masters; // of the universe
     // each master sends one masterdone message and one
     // factorization is calculated per repetition
     //auto supermaster = spawn(supervisor, num_rings+repetitions);
     for (int i = 0; i < num_rings; ++i) {
         masters.push_back(spawn_impl());
-        send(masters.back(), atom("init"),
-                             ring_size,
-                             initial_token_value,
-                             repetitions);
+        anon_send(masters.back(),
+                  atom("init"),
+                  ring_size,
+                  initial_token_value,
+                  repetitions);
     }
-    await_all_others_done();
+    await_all_actors_done();
 }
 
 void usage() {
@@ -245,13 +249,13 @@ enum impl_type { stacked, event_based };
 void run(impl_type impl, int num_rings, int ring_size, int initial_token_value, int repetitions) {
     int num_msgs = num_rings + (num_rings * repetitions);
     auto sv = (impl == event_based) ? spawn<fsm_supervisor>(num_msgs)
-                                    : spawn(supervisor, num_msgs);
+                                    : spawn<blocking_api>(supervisor, num_msgs);
     if (impl == event_based) {
         run_test([sv] { return spawn<fsm_chain_master>(sv); },
                  num_rings, ring_size, initial_token_value, repetitions);
     }
     else {
-        run_test([sv] { return spawn(chain_master, sv); },
+        run_test([sv] { return spawn<blocking_api>(chain_master, sv); },
                  num_rings, ring_size, initial_token_value, repetitions);
     }
 }
