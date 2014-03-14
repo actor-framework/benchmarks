@@ -4,7 +4,7 @@
 #  CPPA_FOUND    - system has libcppa
 #  CPPA_INCLUDE  - libcppa include dir
 #  CPPA_LIBRARY  - link againgst libcppa
-#
+#  CPPA_VERSION  - version in {major}.{minor}.{patch} format
 
 if (CPPA_LIBRARY AND CPPA_INCLUDE)
   set(CPPA_FOUND TRUE)
@@ -81,5 +81,21 @@ else (CPPA_LIBRARY AND CPPA_INCLUDE)
   else (CPPA_INCLUDE AND CPPA_LIBRARY)
     message (FATAL_ERROR "CPPA LIBRARY AND/OR HEADER NOT FOUND!")
   endif (CPPA_INCLUDE AND CPPA_LIBRARY)
+
+  # extract CPPA_VERSION from config.hpp
+  if (CPPA_INCLUDE)
+    # we assume version 0.8.1 if CPPA_VERSION is not defined config.hpp
+    set(CPPA_VERSION 801)
+    file(READ "${CPPA_INCLUDE}/cppa/config.hpp" CPPA_CONFIG_HPP_CONTENT)
+    string(REGEX REPLACE ".*#define CPPA_VERSION ([0-9]+).*" "\\1" CPPA_VERSION "${CPPA_CONFIG_HPP_CONTENT}")
+    if ("${CPPA_VERSION}" MATCHES "^[0-9]+$")
+      math(EXPR CPPA_VERSION_MAJOR "${CPPA_VERSION} / 100000")
+      math(EXPR CPPA_VERSION_MINOR "${CPPA_VERSION} / 100 % 1000")
+      math(EXPR CPPA_VERSION_PATCH "${CPPA_VERSION} % 100")
+      set(CPPA_VERSION "${CPPA_VERSION_MAJOR}.${CPPA_VERSION_MINOR}.${CPPA_VERSION_PATCH}")
+    else ()
+      set(CPPA_VERSION "0.8.1")
+    endif ()
+  endif (CPPA_INCLUDE)
 
 endif (CPPA_LIBRARY AND CPPA_INCLUDE)

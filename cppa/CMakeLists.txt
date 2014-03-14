@@ -8,11 +8,17 @@ set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 find_package(LibCPPA REQUIRED)
 include_directories(. .. ${CPPA_INCLUDE})
-#find_package(Boost REQUIRED)
-#include_directories(. .. ${CPPA_INCLUDE} ${Boost_INCLUDE_DIRS})
+
+if (CPPA_VERSION VERSION_LESS 0.9)
+  set(CPPA_FILE_SUFFIX "_000801")
+else ()
+  set(CPPA_FILE_SUFFIX "")
+endif ()
+
+message("-- running on libcppa version ${CPPA_VERSION}: use suffix \"${CPPA_FILE_SUFFIX}\"")
 
 macro(add_benchmark name)
-  add_executable(${name} ${name}.cpp)
+  add_executable(${name} ${name}${CPPA_FILE_SUFFIX}.cpp)
   # LD_FLAGS set in main CMake file
   target_link_libraries(${name} ${CMAKE_DL_LIBS} ${CPPA_LIBRARY} ${LD_FLAGS})
   add_dependencies(${name} all_benchmarks)

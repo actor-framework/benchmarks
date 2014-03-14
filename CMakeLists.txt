@@ -7,7 +7,6 @@ set (CMAKE_BUILD_TYPE RELEASE)
 set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_definitions (-DNDEBUG)
-add_definitions (-DCPPA_OPENCL)
 
 if (    "${DISABLED_FEATURES}" MATCHES "cppa"
     AND "${DISABLED_FEATURES}" MATCHES "theron")
@@ -53,7 +52,7 @@ else ()
     find_package(OPENCL REQUIRED)
     set(LD_FLAGS ${LD_FLAGS} ${OPENCL_LIBRARIES})
     set(INCLUDE_DIRS ${INCLUDE_DIRS} ${OPENCL_INCLUDE_DIR})
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCPPA_OPENCL")
+    add_definitions (-DCPPA_OPENCL)
   endif (ENABLE_OPENCL)
 endif ()
 
@@ -119,7 +118,7 @@ else()
   add_dependencies(benchmark_target gobench)
 endif ()
 
-if ("${DISABLED_BENCHMARKS}" MATCHES "tools")
+if ("${DISABLED_FEATURES}" MATCHES "tools")
   message (STATUS "skip tools (disabled)")
 else ()
   add_subdirectory(tools)
