@@ -11,7 +11,7 @@ case class Result(value: Int)
 
 class Testee(parent: ActorRef) extends Actor {
     def receive = {
-        case Spread(0) =>
+        case Spread(1) =>
             parent ! Result(1)
             context.stop(self)
         case Spread(s) =>

@@ -44,7 +44,7 @@ struct testee : sb_actor<testee> {
     behavior init_state;
     testee(const actor& parent) {
         init_state = (
-            on(atom("spread"), (uint32_t) 0) >> [=]() {
+            on(atom("spread"), (uint32_t) 1) >> [=] {
                 send(parent, atom("result"), (uint32_t) 1);
                 quit();
             },
@@ -69,7 +69,7 @@ struct testee : sb_actor<testee> {
 
 void stacked_testee(blocking_actor* self, actor parent) {
     self->receive (
-        on(atom("spread"), (uint32_t) 0) >> [&]() {
+        on(atom("spread"), (uint32_t) 1) >> [&]() {
             self->send(parent, atom("result"), (uint32_t) 1);
         },
         on(atom("spread"), arg_match) >> [&](uint32_t x) {

@@ -3,7 +3,7 @@
 
 testee(Pid) ->
     receive
-        {spread, 0} ->
+        {spread, 1} ->
             Pid ! {result, 1};
         {spread, X} ->
             spawn(actor_creation, testee, [self()]) ! {spread, X-1},
@@ -30,4 +30,3 @@ start(X) ->
                     error("unexpected result!")
             end
     end.
-
