@@ -34,15 +34,14 @@
 #include <iostream>
 
 #include "utility.hpp"
-
-#include "cppa/cppa.hpp"
+#include "backward_compatibility.hpp"
 
 using namespace std;
 using namespace cppa;
 
 struct testee : sb_actor<testee> {
     behavior init_state;
-    testee(const actor& parent) {
+    testee(const actor_hdl& parent) {
         init_state = (
             on(atom("spread"), (uint32_t) 1) >> [=] {
                 send(parent, atom("result"), (uint32_t) 1);
@@ -67,22 +66,22 @@ struct testee : sb_actor<testee> {
     }
 };
 
-void stacked_testee(blocking_actor* self, actor parent) {
-    self->receive (
+void stacked_testee(BLOCKING_SELF_ARG actor_hdl parent) {
+    SELF_PREFIX receive (
         on(atom("spread"), (uint32_t) 1) >> [&]() {
-            self->send(parent, atom("result"), (uint32_t) 1);
+            SELF_PREFIX send(parent, atom("result"), (uint32_t) 1);
         },
         on(atom("spread"), arg_match) >> [&](uint32_t x) {
-            auto child1 = self->spawn<blocking_api>(stacked_testee, self);
-            auto child2 = self->spawn<blocking_api>(stacked_testee, self);
+            auto child1 = SELF_PREFIX spawn<blocking_api>(stacked_testee, self);
+            auto child2 = SELF_PREFIX spawn<blocking_api>(stacked_testee, self);
             any_tuple msg = make_cow_tuple(atom("spread"), x - 1);
-            self->send_tuple(child1, msg);
-            self->send_tuple(child2, msg);
-            self->receive (
+            SELF_PREFIX send_tuple(child1, msg);
+            SELF_PREFIX send_tuple(child2, msg);
+            SELF_PREFIX receive (
                 on(atom("result"), arg_match) >> [&](uint32_t v1) {
-                    self->receive (
+                    SELF_PREFIX receive (
                         on(atom("result"), arg_match) >> [&](uint32_t v2) {
-                            self->send(parent, atom("result"), v1 + v2);
+                            SELF_PREFIX send(parent, atom("result"), v1 + v2);
                         }
                     );
                 }

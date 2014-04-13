@@ -34,8 +34,7 @@
 #include <iostream>
 
 #include "utility.hpp"
-
-#include "cppa/cppa.hpp"
+#include "backward_compatibility.hpp"
 
 using namespace std;
 using namespace cppa;
@@ -54,16 +53,16 @@ struct fsm_receiver : sb_actor<fsm_receiver> {
     }
 };
 
-void receiver(blocking_actor* self, uint64_t max) {
+void receiver(BLOCKING_SELF_ARG uint64_t max) {
     uint64_t value;
-    self->receive_while (gref(value) < max) (
+    SELF_PREFIX receive_while (gref(value) < max) (
         on(atom("msg")) >> [&] {
             ++value;
         }
     );
 }
 
-void sender(actor whom, uint64_t count) {
+void sender(actor_hdl whom, uint64_t count) {
     if (!whom) return;
     any_tuple msg = make_cow_tuple(atom("msg"));
     for (uint64_t i = 0; i < count; ++i) {

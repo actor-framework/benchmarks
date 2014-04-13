@@ -34,7 +34,7 @@
 #include <numeric>
 #include <iostream>
 
-#include "cppa/cppa.hpp"
+#include "backward_compatibility.hpp"
 
 #ifdef ENABLE_OPENCL
 #include "cppa/opencl.hpp"

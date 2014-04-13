@@ -20,3 +20,4 @@ scala/matching.scala
 scala/mixed_case.scala
 scala/utility.scala
 cppa/matrix.cpp
+cppa/backward_compatibility.hpp

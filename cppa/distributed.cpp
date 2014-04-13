@@ -33,8 +33,7 @@
 #include <iostream>
 
 #include "utility.hpp"
-
-#include "cppa/cppa.hpp"
+#include "backward_compatibility.hpp"
 
 using namespace std;
 using namespace cppa;
@@ -69,11 +68,11 @@ void usage() {
 struct ping_actor : sb_actor<ping_actor> {
 
     behavior init_state;
-    actor parent;
+    actor_hdl parent;
 
-    ping_actor(actor parent_ptr) : parent(move(parent_ptr)) {
+    ping_actor(actor_hdl parent_ptr) : parent(move(parent_ptr)) {
         init_state = (
-            on(atom("kickoff"), arg_match) >> [=](actor pong, uint32_t value) {
+            on(atom("kickoff"), arg_match) >> [=](actor_hdl pong, uint32_t value) {
                 send(pong, atom("ping"), value);
                 become (
                     on(atom("pong"), uint32_t(0)) >> [=] {
@@ -102,7 +101,7 @@ struct ping_actor : sb_actor<ping_actor> {
 
 struct server_actor : sb_actor<server_actor> {
 
-    typedef map<pair<string, uint16_t>, actor> pong_map;
+    typedef map<pair<string, uint16_t>, actor_hdl> pong_map;
 
     behavior init_state;
     pong_map m_pongs;
@@ -131,7 +130,7 @@ struct server_actor : sb_actor<server_actor> {
                     return make_any_tuple(atom("ok"));
                 }
             },
-            on(atom("kickoff"), arg_match) >> [=](uint32_t num_pings, actor buddy) {
+            on(atom("kickoff"), arg_match) >> [=](uint32_t num_pings, actor_hdl buddy) {
                 for (auto& kvp : m_pongs) {
                     auto ping = spawn<ping_actor>(buddy);
                     send(ping, atom("kickoff"), kvp.second, num_pings);
@@ -229,32 +228,33 @@ void client_mode(Iterator first, Iterator last) {
         cout << "less than two nodes given" << endl;
         exit(1);
     }
-    vector<actor> remote_actors;
+    vector<actor_hdl> remote_actors;
     for (auto& r : remotes) {
         remote_actors.push_back(remote_actor(r.first.c_str(), r.second));
     }
     // setup phase
-    scoped_actor self;
+    SCOPED_SELF;
     //cout << "tell server nodes to connect to each other" << endl;
     for (size_t i = 0; i < remotes.size(); ++i) {
         for (size_t j = 0; j < remotes.size(); ++j) {
             if (i != j) {
                 auto& r = remotes[j];
-                self->send(remote_actors[i], atom("add_pong"), r.first, r.second);
+                SELF_PREFIX send(remote_actors[i], atom("add_pong"),
+                                 r.first, r.second);
             }
         }
     }
     { // collect {ok} messages
         size_t i = 0;
         size_t end = remote_actors.size() * (remote_actors.size() - 1);
-        self->receive_for(i, end) (
+        SELF_PREFIX receive_for(i, end) (
             on(atom("ok")) >> [] {
                 // nothing to do
             },
             on(atom("error"), arg_match) >> [&](const string& str) {
                 cout << "error: " << str << endl;
                 for (auto& x : remote_actors) {
-                    self->send(x, atom("purge"));
+                    SELF_PREFIX send(x, atom("purge"));
                 }
                 throw logic_error("");
             },
@@ -267,7 +267,7 @@ void client_mode(Iterator first, Iterator last) {
             after(chrono::seconds(10)) >> [&] {
                 cout << "remote didn't answer within 10sec." << endl;
                 for (auto& x : remote_actors) {
-                    self->send(x, atom("purge"));
+                    SELF_PREFIX send(x, atom("purge"));
                 }
                 throw logic_error("");
             }
@@ -277,12 +277,12 @@ void client_mode(Iterator first, Iterator last) {
     //cout << "setup done" << endl;
     //cout << "kickoff, init value = " << init_value << endl;
     for (auto& r : remote_actors) {
-        self->send(r, atom("kickoff"), init_value, self);
+        SELF_PREFIX send(r, atom("kickoff"), init_value, self);
     }
     { // collect {done} messages
         size_t i = 0;
         size_t end = remote_actors.size() * (remote_actors.size() - 1);
-        self->receive_for(i, end) (
+        SELF_PREFIX receive_for(i, end) (
             on(atom("done")) >> [] {
                 //cout << "...done..." << endl;
             },
@@ -306,13 +306,13 @@ void shutdown_mode(Iterator first, Iterator last) {
             remotes.emplace_back(move(host), static_cast<uint16_t>(port));
         }
     );
-    scoped_actor self;
+    SCOPED_SELF;
     for (auto& r : remotes) {
         try {
-            actor x = remote_actor(r.first, r.second);
+            auto x = remote_actor(r.first, r.second);
             self->monitor(x);
-            self->send(x, atom("shutdown"));
-            self->receive (
+            SELF_PREFIX send(x, atom("shutdown"));
+            SELF_PREFIX receive (
                 on(atom("DOWN"), val<uint32_t>) >> [] {
                     // ok, done
                 },

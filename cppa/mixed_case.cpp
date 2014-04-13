@@ -35,8 +35,7 @@
 #include <functional>
 
 #include "utility.hpp"
-
-#include "cppa/cppa.hpp"
+#include "backward_compatibility.hpp"
 
 using namespace std;
 using namespace cppa;
@@ -57,9 +56,9 @@ void check_factors(const factors& vec) {
 }
 
 struct fsm_worker : sb_actor<fsm_worker> {
-    actor mc;
+    actor_hdl mc;
     behavior init_state;
-    fsm_worker(const actor& msgcollector) : mc(msgcollector) {
+    fsm_worker(const actor_hdl& msgcollector) : mc(msgcollector) {
         init_state = (
             on<atom("calc"), uint64_t>() >> [=](uint64_t what) {
                 send(mc, atom("result"), factorize(what));
@@ -72,9 +71,9 @@ struct fsm_worker : sb_actor<fsm_worker> {
 };
 
 struct fsm_chain_link : sb_actor<fsm_chain_link> {
-    actor next;
+    actor_hdl next;
     behavior init_state;
-    fsm_chain_link(const actor& n) : next(n) {
+    fsm_chain_link(const actor_hdl& n) : next(n) {
         init_state = (
             on<atom("token"), int>() >> [=](int v) {
                 send_tuple(next, std::move(last_dequeued()));
@@ -86,9 +85,9 @@ struct fsm_chain_link : sb_actor<fsm_chain_link> {
 
 struct fsm_chain_master : sb_actor<fsm_chain_master> {
     int iteration;
-    actor mc;
-    actor next;
-    actor worker;
+    actor_hdl mc;
+    actor_hdl next;
+    actor_hdl worker;
     behavior init_state;
     void new_ring(int ring_size, int initial_token_value) {
         send(worker, atom("calc"), s_task_n);
@@ -98,7 +97,7 @@ struct fsm_chain_master : sb_actor<fsm_chain_master> {
         }
         send(next, atom("token"), initial_token_value);
     }
-    fsm_chain_master(actor msgcollector) : iteration(0), mc(msgcollector) {
+    fsm_chain_master(actor_hdl msgcollector) : iteration(0), mc(msgcollector) {
         init_state = (
             on(atom("init"), arg_match) >> [=](int rs, int itv, int n) {
                 worker = spawn<fsm_worker>(msgcollector);
@@ -140,24 +139,24 @@ struct fsm_supervisor : sb_actor<fsm_supervisor> {
     }
 };
 
-void chain_link(blocking_actor* self, actor next) {
+void chain_link(BLOCKING_SELF_ARG actor_hdl next) {
     bool done = false;
-    self->do_receive (
+    SELF_PREFIX do_receive (
         on<atom("token"), int>() >> [&](int v) {
             if (v == 0) {
                 done = true;
             }
-            self->send_tuple(next, std::move(self->last_dequeued()));
+            SELF_PREFIX send_tuple(next, std::move(self->last_dequeued()));
         }
     )
     .until([&]() { return done == true; });
 }
 
-void worker_fun(blocking_actor* self, actor msgcollector) {
+void worker_fun(BLOCKING_SELF_ARG actor_hdl msgcollector) {
     bool done = false;
-    self->do_receive (
+    SELF_PREFIX do_receive (
         on<atom("calc"), uint64_t>() >> [&](uint64_t what) {
-            self->send(msgcollector, atom("result"), factorize(what));
+            SELF_PREFIX send(msgcollector, atom("result"), factorize(what));
         },
         on(atom("done")) >> [&]() {
             done = true;
@@ -166,42 +165,42 @@ void worker_fun(blocking_actor* self, actor msgcollector) {
     .until([&]() { return done == true; });
 }
 
-actor new_ring(actor next, int ring_size) {
+actor_hdl new_ring(actor_hdl next, int ring_size) {
     for (int i = 1; i < ring_size; ++i) next = spawn<blocking_api>(chain_link, next);
     return next;
 }
 
-void chain_master(blocking_actor* self, actor msgcollector) {
-    auto worker = self->spawn<blocking_api>(worker_fun, msgcollector);
-    self->receive (
+void chain_master(BLOCKING_SELF_ARG actor_hdl msgcollector) {
+    auto worker = SELF_PREFIX spawn<blocking_api>(worker_fun, msgcollector);
+    SELF_PREFIX receive (
         on(atom("init"), arg_match) >> [&](int rs, int itv, int n) {
             int iteration = 0;
             auto next = new_ring(self, rs);
-            self->send(next, atom("token"), itv);
-            self->send(worker, atom("calc"), s_task_n);
-            self->do_receive (
+            SELF_PREFIX send(next, atom("token"), itv);
+            SELF_PREFIX send(worker, atom("calc"), s_task_n);
+            SELF_PREFIX do_receive (
                 on<atom("token"), int>() >> [&](int v) {
                     if (v == 0) {
                         if (++iteration < n) {
                             next = new_ring(self, rs);
-                            self->send(next, atom("token"), itv);
-                            self->send(worker, atom("calc"), s_task_n);
+                            SELF_PREFIX send(next, atom("token"), itv);
+                            SELF_PREFIX send(worker, atom("calc"), s_task_n);
                         }
                     }
                     else {
-                        self->send(next, atom("token"), v - 1);
+                        SELF_PREFIX send(next, atom("token"), v - 1);
                     }
                 }
             )
             .until([&]() { return iteration == n; });
         }
     );
-    self->send(msgcollector, atom("masterdone"));
-    self->send(worker, atom("done"));
+    SELF_PREFIX send(msgcollector, atom("masterdone"));
+    SELF_PREFIX send(worker, atom("done"));
 }
 
-void supervisor(blocking_actor* self, int num_msgs) {
-    self->do_receive (
+void supervisor(BLOCKING_SELF_ARG int num_msgs) {
+    SELF_PREFIX do_receive (
         on(atom("masterdone")) >> [&]() {
             --num_msgs;
         },
@@ -217,7 +216,7 @@ template<typename F>
 void run_test(F spawn_impl,
               int num_rings, int ring_size,
               int initial_token_value, int repetitions) {
-    std::vector<actor> masters; // of the universe
+    std::vector<actor_hdl> masters; // of the universe
     // each master sends one masterdone message and one
     // factorization is calculated per repetition
     //auto supermaster = spawn(supervisor, num_rings+repetitions);
