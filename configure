@@ -23,6 +23,7 @@ Usage: $0 [OPTION]... [VAR=VALUE]...
     --no-theron                 exclude benchmarks for Theron
     --no-tools                  exclude evaluation tools
     --with-opencl               build libcppa with OpenCL support
+    --cppa-only                 exclude all but the libcppa benchmarks
 
   Compiler Options:
     --with-clang=PATH           path to clang++ executable
@@ -183,6 +184,9 @@ while [ $# -ne 0 ]; do
             ;;
         --no-tools)
             ExcludedFeatures="tools_$ExcludedFeatures"
+            ;;
+        --cppa-only)
+            ExcludedFeatures="theron_scala_erlang_golang_tools_$ExcludedFeatures"
             ;;
         *)
             echo "Invalid option '$1'.  Try $0 --help to see available options."
