@@ -39,6 +39,8 @@
 using namespace std;
 using namespace cppa;
 
+namespace { uint32_t s_num; }
+
 struct testee : sb_actor<testee> {
     behavior init_state;
     testee(const actor_hdl& parent) {
@@ -55,7 +57,17 @@ struct testee : sb_actor<testee> {
                     on(atom("result"), arg_match) >> [=](uint32_t r1) {
                         become (
                             on(atom("result"), arg_match) >> [=](uint32_t r2) {
-                                send(parent, atom("result"), r1 + r2);
+                                if (parent == invalid_actor) {
+                                    uint32_t res = 2 + r1 + r2;
+                                    uint32_t expected = (1 << s_num);
+                                    if (res != expected) {
+                                        cerr << "expected: " << expected
+                                             << ", found: " << res
+                                             << endl;
+                                        exit(42);
+                                    }
+                                }
+                                else send(parent, atom("result"), 1 + r1 + r2);
                                 quit();
                             }
                         );
@@ -100,9 +112,11 @@ int main(int argc, char** argv) {
     vector<string> args(argv + 1, argv + argc);
     match (args) (
         on("--stacked", spro<uint32_t>) >> [](uint32_t num) {
+            s_num = num;
             anon_send(spawn<blocking_api>(stacked_testee, invalid_actor), atom("spread"), num);
         },
         on(spro<uint32_t>) >> [](uint32_t num) {
+            s_num = num;
             anon_send(spawn<testee>(invalid_actor), atom("spread"), num);
         },
         others() >> usage

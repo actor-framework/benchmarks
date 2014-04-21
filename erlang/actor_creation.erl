@@ -12,7 +12,7 @@ testee(Pid) ->
                 {result, R1} ->
                     receive
                         {result, R2} ->
-                            Pid ! {result, (R1+R2)}
+                            Pid ! {result, (1+R1+R2)}
                     end
             end
     end.
@@ -24,8 +24,8 @@ start(X) ->
     receive
         {result, R} ->
             if
-                R == (1 bsl N) ->
-                    R;
+                (1 + R) == (1 bsl N) ->
+                    ok;
                 true ->
                     error("unexpected result!")
             end

@@ -22,7 +22,7 @@ class Testee(parent: ActorRef) extends Actor {
                 case Result(r1) =>
                     context.become {
                         case Result(r2) =>
-                            parent ! Result(r1 + r2)
+                            parent ! Result(1 + r1 + r2)
                             context.stop(self)
                     }
             }
@@ -34,8 +34,10 @@ class RootTestee(n: Int) extends Actor {
         case GoAhead =>
             context.actorOf(Props(new Testee(self))) ! Spread(n)
         case Result(v) =>
-            if (v != (1 << n)) {
-                Console.println("Expected " + (1 << n) + ", received " + v)
+            val res = v + 1
+            val expected = 1 << n
+            if (res != expected) {
+                Console.println("Expected " + expected + ", received " + res)
                 System.exit(42)
             }
             global_latch.countDown
