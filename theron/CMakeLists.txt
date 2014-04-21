@@ -3,7 +3,11 @@ project(theron_benchmarks CXX)
 
 add_custom_target(theron_benchmarks)
 
-find_package(Boost REQUIRED)
+#find_package(Boost REQUIRED)
+
+add_definitions(-DTHERON_BOOST=0 -DTHERON_CPP11=1)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 if ("${THERON_ROOT}" STREQUAL "")
   message(FATAL_ERROR "sorry, Theron without using --with-theron=PATH not supported yet")

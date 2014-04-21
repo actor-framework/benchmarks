@@ -81,7 +81,8 @@ std::vector<uint64_t> factorize(uint64_t n) {
 template<typename T>
 cppa::optional<T> spro(const std::string& str) {
     T value;
-    if (std::istringstream(str) >> value) {
+    std::istringstream iss(str);
+    if (iss >> value) {
         return value;
     }
     return {};

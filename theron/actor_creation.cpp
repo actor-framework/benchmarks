@@ -1,6 +1,4 @@
-#define THERON_USE_BOOST_THREADS 1
-#include <Theron/Framework.h>
-#include <Theron/Actor.h>
+#include <Theron/Theron.h> 
 
 #include <thread>
 #include <cstdint>
@@ -10,32 +8,31 @@
 #define THERON_BENCHMARK
 #include "utility.hpp"
 
-using std::cout;
-using std::endl;
-using std::uint32_t;
-
 struct spread { int value; };
 struct result { uint32_t value; };
 
+using namespace std;
 using namespace Theron;
+
+typedef shared_ptr<Actor> actor_ptr;
 
 struct testee : Actor {
 
     Address m_parent;
     bool m_first_result_received;
     uint32_t m_first_result;
-    std::vector<ActorRef> m_children;
+    vector<actor_ptr> m_children;
 
-    void spread_handler(const spread& arg, const Address) {
-        if (arg.value == 0) {
+    void spread_handler(const spread& arg, const Address parent) {
+        m_parent = parent;
+        if (arg.value == 1) {
             Send(result{1}, m_parent);
         }
         else {
-            spread msg = {arg.value-1};
-            Parameters params = {GetAddress()};
+            spread msg{arg.value-1};
             for (int i = 0; i < 2; ++i) {
-                m_children.push_back(GetFramework().CreateActor<testee>(params));
-                m_children.back().Push(msg, GetAddress());
+                m_children.emplace_back(new testee(GetFramework()));
+                Send(msg, m_children.back()->GetAddress());
             }
         }
     }
@@ -47,13 +44,11 @@ struct testee : Actor {
         }
         else {
             m_children.clear();
-            Send(result{m_first_result + arg.value}, m_parent);
+            Send(result{1 + m_first_result + arg.value}, m_parent);
         }
     }
 
-    typedef struct { Address arg0; } Parameters;
-
-    testee(const Parameters& p) : m_parent(p.arg0), m_first_result_received(false) {
+    testee(Framework& f) : Actor(f), m_first_result_received(false) {
         RegisterHandler(this, &testee::spread_handler);
         RegisterHandler(this, &testee::result_handler);
     }
@@ -61,21 +56,37 @@ struct testee : Actor {
 };
 
 void usage() {
-    cout << "usage: theron_actor_creation _ POW" << endl
+    cout << "usage: theron_actor_creation POW" << endl
          << "       creates 2^POW actors" << endl
          << endl;
 }
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
+    if (argc != 2) {
         usage();
         return 1;
     }
-    int num = rd<int>(argv[2]);
-    Receiver r;
+    int num = rd<int>(argv[1]);
     Framework framework(num_cores());
-    ActorRef aref(framework.CreateActor<testee>(testee::Parameters{r.GetAddress()}));
-    aref.Push(spread{num}, r.GetAddress());
-    r.Wait();
+    Receiver r;
+    { // lifetime scope of root actor
+        testee root{framework};
+        framework.Send(spread{num}, r.GetAddress(), root.GetAddress());
+        struct checker {
+            int m_num;
+            checker(int num_arg) : m_num(num_arg) { }
+            void check_res(const result& arg, const Address) {
+                auto expected = uint32_t{1} << m_num;
+                auto res = arg.value + 1;
+                if (expected != res) {
+                    cout << "expected: " << expected  << ", "
+                         << "received: " << res << endl;
+                    exit(42);
+                }
+            }
+        } foo{num};
+        r.RegisterHandler(&foo, &checker::check_res);
+        r.Wait();
+    }
 }
 
