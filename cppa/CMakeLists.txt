@@ -6,34 +6,34 @@ include_directories(.)
 
 set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
-find_package(LibCPPA REQUIRED)
-include_directories(. .. ${CPPA_INCLUDE})
+find_package(Libcaf REQUIRED)
+include_directories(. .. ${LIBCAF_INCLUDE_DIR})
 
-if (CPPA_LOG_LEVEL)
-  add_definitions(-DCPPA_LOG_LEVEL=${CPPA_LOG_LEVEL})
-endif(CPPA_LOG_LEVEL)
+if (LIBCAF_LOG_LEVEL)
+  add_definitions(-DLIBCAF_LOG_LEVEL=${LIBCAF_LOG_LEVEL})
+endif(LIBCAF_LOG_LEVEL)
 
 macro(add_benchmark name)
   add_executable(${name} ${name}.cpp)
   # LD_FLAGS set in main CMake file
-  target_link_libraries(${name} ${CMAKE_DL_LIBS} ${CPPA_LIBRARY} ${LD_FLAGS})
+  target_link_libraries(${name} ${CMAKE_DL_LIBS} ${LIBCAF_LIBRARIES} ${LD_FLAGS})
   add_dependencies(${name} all_benchmarks)
 endmacro()
 
 add_benchmark(actor_creation)
 add_benchmark(mailbox_performance)
 add_benchmark(mixed_case)
-add_benchmark(distributed)
-add_benchmark(matching)
-add_benchmark(matrix)
+#add_benchmark(distributed)
+#add_benchmark(matching)
+#add_benchmark(matrix)
 
 # done (print summary)
 message("\n==================| CPPA Build Summary |==================="
         "\n"
-        "\nLibcppa version:   ${CPPA_VERSION}"
+        "\nLibcaf:           ${LIBCAF_LIBRARIES}"
         "\n"
         "\nBuild type:        ${CMAKE_BUILD_TYPE}"
-        "\nLog level:         ${CPPA_LOG_LEVEL}"
+        "\nLog level:         ${LIBCAF_LOG_LEVEL}"
         "\n"
         "\nCXX:               ${CMAKE_CXX_COMPILER}"
         "\nCXXFLAGS:          ${CMAKE_CXX_FLAGS}"

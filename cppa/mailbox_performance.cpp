@@ -55,7 +55,7 @@ struct fsm_receiver : sb_actor<fsm_receiver> {
 
 void receiver(BLOCKING_SELF_ARG uint64_t max) {
     uint64_t value;
-    SELF_PREFIX receive_while (gref(value) < max) (
+    SELF_PREFIX receive_while ([&] { return value < max; }) (
         on(atom("msg")) >> [&] {
             ++value;
         }

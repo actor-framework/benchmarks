@@ -73,13 +73,13 @@ std::vector<uint64_t> factorize(uint64_t n) {
     return std::move(result);
 }
 
-// some utility for cppa benchmarks only
+// some utility for caf benchmarks only
 #ifndef THERON_BENCHMARK
 
-#include "cppa/optional.hpp"
+#include "caf/optional.hpp"
 // a string => T projection
 template<typename T>
-cppa::optional<T> spro(const std::string& str) {
+caf::optional<T> spro(const std::string& str) {
     T value;
     std::istringstream iss(str);
     if (iss >> value) {
