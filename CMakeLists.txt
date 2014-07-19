@@ -45,17 +45,6 @@ else ()
   endif ()
 endif ()
 
-if ("${DISABLED_FEATURES}" MATCHES "cppa")
-  # OpenCL only used by cppa benchmarks
-else ()
-  if (ENABLE_OPENCL)
-    find_package(OPENCL REQUIRED)
-    set(LD_FLAGS ${LD_FLAGS} ${OPENCL_LIBRARIES})
-    set(INCLUDE_DIRS ${INCLUDE_DIRS} ${OPENCL_INCLUDE_DIR})
-    add_definitions (-DCPPA_OPENCL)
-  endif (ENABLE_OPENCL)
-endif ()
-
 set (CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
 set (EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 set (PROJECT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/.)
