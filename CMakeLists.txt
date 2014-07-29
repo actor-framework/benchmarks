@@ -1,126 +1,66 @@
 cmake_minimum_required (VERSION 2.8.6)
 project (benchmarks)
 
-set (CMAKE_CXX_FLAGS_RELEASE "-O3")
-set (CMAKE_BUILD_TYPE RELEASE)
-
 set (CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_definitions (-DNDEBUG)
+add_custom_target(all_benchmarks)
 
-if (    "${DISABLED_FEATURES}" MATCHES "cppa"
-    AND "${DISABLED_FEATURES}" MATCHES "theron")
-else ()
-  # check if the user provided CXXFLAGS on the command line
-  if ("${CMAKE_CXX_FLAGS}" STREQUAL "")
-    set (CXXFLAGS_PROVIDED false)
-    set (CMAKE_CXX_FLAGS "-std=c++11 -Wextra -Wall -pedantic ")
-  else ()
-    set (CXXFLAGS_PROVIDED true)
-  endif ()
-  # check for g++ >= 4.7 or clang++ > = 3.2
-  try_run (ProgramResult
-           CompilationSucceeded
-           ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/get_compiler_version.cpp
-           RUN_OUTPUT_VARIABLE CompilerVersion)
-  if (NOT CompilationSucceeded OR NOT (ProgramResult EQUAL 0))
-    message (FATAL_ERROR "Cannot determine compiler version")
-  elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-    if (CompilerVersion VERSION_GREATER 4.6)
-      message (STATUS "Found g++ version ${CompilerVersion}")
-    else ()
-      message (FATAL_ERROR "g++ >= 4.7 required (found: ${CompilerVersion}.")
-    endif ()
-  elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    if (CompilerVersion VERSION_GREATER 3.1)
-      message (STATUS "Found clang++ version ${CompilerVersion}")
-    else ()
-      message (FATAL_ERROR "clang++ >= 3.2 required (found: ${CompilerVersion}.")
-    endif ()
-    if  (NOT CXXFLAGS_PROVIDED)
-      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
-    endif ()
-  else ()
-    message (FATAL_ERROR "Your C++ compiler does not support C++11.")
-  endif ()
-endif ()
+# search for Scala compiler if not disabled by the user
+if(NOT CAF_NO_SCALA_BENCHMARKS)
+  if(NOT CAF_SCALA_COMPILER)
+    set(CAF_SCALA_COMPILER "scalac")
+  endif()
+  execute_process(COMMAND "${CAF_SCALA_COMPILER}" "-version"
+                  RESULT_VARIABLE ScalacResult
+                  ERROR_VARIABLE ScalacVersionStr)
+  if(ScalacResult EQUAL 0)
+    string(REGEX REPLACE ".*version ([0-9]+\\.[0-9]+\\.[0-9]+).*" "\\1"
+           ScalacVersion "${ScalacVersionStr}")
+    if(ScalacVersion VERSION_LESS 2.10)
+      message(STATUS "Disable Scala benchmarks: version >= 2.10 required, ${ScalacVersion} found")
+      set(CAF_NO_SCALA_BENCHMARKS yes)
+    endif()
+  else()
+      message(STATUS "Disable Scala benchmarks: could not find a running compiler")
+    set(CAF_NO_SCALA_BENCHMARKS yes)
+  endif()
+endif()
 
-if ("${DISABLED_FEATURES}" MATCHES "cppa")
-  # OpenCL only used by cppa benchmarks
-else ()
-  if (ENABLE_OPENCL)
-    find_package(OPENCL REQUIRED)
-    set(LD_FLAGS ${LD_FLAGS} ${OPENCL_LIBRARIES})
-    set(INCLUDE_DIRS ${INCLUDE_DIRS} ${OPENCL_INCLUDE_DIR})
-    add_definitions (-DCPPA_OPENCL)
-  endif (ENABLE_OPENCL)
-endif ()
+# add targets for Scala benchmarks
+if(NOT CAF_NO_SCALA_BENCHMARKS)
+  set(CAF_SCALABENCH_SRC_PATH ${CMAKE_CURRENT_SOURCE_DIR}/scala)
+  set(CAF_SCALABENCH_BIN_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf)
+  macro(add_scala_target name)
+    add_custom_command(OUTPUT ${CAF_SCALABENCH_BIN_PATH}/${name}.class
+                       COMMAND ${CAF_SCALA_COMPILER}
+                               ${CAF_SCALABENCH_SRC_PATH}/${name}.scala
+                       DEPENDS ${CAF_SCALABENCH_SRC_PATH}/${name}.scala
+                               ${ARGN}
+                       WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
+                       VERBATIM)
+    set(CAF_SCALABENCH_${name} ${CAF_SCALABENCH_BIN_PATH}/${name}.class)
+    set(CAF_SCALABENCH_CLASS_FILES
+        ${CAF_SCALABENCH_${name}}
+        ${CAF_SCALABENCH_CLASS_FILES})
+  endmacro()
+  add_scala_target(utility)
+  add_scala_target(actor_creation ${CAF_SCALABENCH_utility})
+  add_scala_target(mailbox_performance ${CAF_SCALABENCH_utility})
+  add_scala_target(mixed_case ${CAF_SCALABENCH_utility})
+  add_custom_target(scala_benchmarks DEPENDS ${CAF_SCALABENCH_CLASS_FILES})
+  add_dependencies(scala_benchmarks all_benchmarks)
+endif()
 
-set (CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
-set (EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
-set (PROJECT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/.)
+# add targets for CAF benchmarks
+macro(add_caf_benchmark name)
+  add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/caf/${name}.cpp)
+  target_link_libraries(${name} ${LIBCAF_LIBRARIES} ${LD_FLAGS})
+  add_dependencies(${name} all_benchmarks)
+endmacro()
 
-add_custom_target(benchmark_target ALL)
-
-include_directories("${PROJECT_INCLUDE_DIR}")
-include_directories("${PROJECT_SOURCE_DIR}")
-
-if ("${DISABLED_FEATURES}" MATCHES "cppa")
-  message (STATUS "skip libcppa benchmarks (disabled)")
-else ()
-  add_subdirectory(cppa)
-endif ()
-
-if ("${DISABLED_FEATURES}" MATCHES "theron")
-  message (STATUS "skip Theron benchmarks (disabled)")
-else ()
-  add_subdirectory(theron)
-  add_dependencies(benchmark_target theron_benchmarks)
-endif ()
-
-
-if ("${DISABLED_FEATURES}" MATCHES "scala")
-  message (STATUS "skip Scala benchmarks (disabled)")
-else ()
-  # check for scalac and version
-  if ("${SCALAC}" STREQUAL "")
-    set (SCALAC "scalac")
-  endif ()
-  execute_process (COMMAND "${SCALAC}" "-version"
-                   RESULT_VARIABLE ScalacResult
-                   ERROR_VARIABLE ScalacVersionStr)
-  if (ScalacResult EQUAL 0)
-    message (STATUS "Scala compiler ${SCALAC} appears to be working")
-  else ()
-    message (FATAL_ERROR "Scala compiler ${SCALAC} not found")
-  endif ()
-  string (REGEX REPLACE ".*version ([0-9]+\\.[0-9]+\\.[0-9]+).*" "\\1" ScalacVersion 
-"${ScalacVersionStr}")
-  if (ScalacVersion VERSION_LESS 2.10)
-    message (FATAL_ERROR "Scala compiler in version >= 2.10 required, "
-                         "found: ${ScalacVersion}")
-  endif ()
-  add_subdirectory(scala)
-  add_dependencies(benchmark_target scalabench)
-endif ()
-
-if ("${DISABLED_FEATURES}" MATCHES "erlang")
-  message (STATUS "skip Erlang benchmarks (disabled)")
-else()
-  add_subdirectory(erlang)
-  add_dependencies(benchmark_target erlangbench)
-endif ()
-
-if ("${DISABLED_FEATURES}" MATCHES "golang")
-  message (STATUS "skip Go benchmarks (disabled)")
-else()
-  add_subdirectory(go)
-  add_dependencies(benchmark_target gobench)
-endif ()
-
-if ("${DISABLED_FEATURES}" MATCHES "tools")
-  message (STATUS "skip tools (disabled)")
-else ()
-  add_subdirectory(tools)
-  add_dependencies(benchmark_target all_tools)
-endif ()
+add_caf_benchmark(actor_creation)
+add_caf_benchmark(mailbox_performance)
+add_caf_benchmark(mixed_case)
+#add_caf_benchmark(distributed)
+#add_caf_benchmark(matching)
+#add_caf_benchmark(matrix)
