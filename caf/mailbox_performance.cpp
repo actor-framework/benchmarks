@@ -55,9 +55,8 @@ void sender(actor whom, uint64_t count) {
 }
 
 void usage() {
-    cout << "usage: mailbox_performance "
-            "NUM_THREADS MSGS_PER_THREAD" << endl
-         << endl;
+    cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD"
+         << endl << endl;
     exit(1);
 }
 
@@ -72,14 +71,12 @@ void run(uint64_t num_sender, uint64_t num_msgs) {
 int main(int argc, char** argv) {
   if (argc != 3) {
     usage();
-    return 1;
   }
   try {
     run(stoll(argv[1]), stoll(argv[2]));
   }
   catch (std::exception&) {
     usage();
-    return 1;
   }
   await_all_actors_done();
   shutdown();

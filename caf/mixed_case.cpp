@@ -167,15 +167,28 @@ class supervisor : public event_based_actor{
 
 void usage() {
     cout << "usage: mailbox_performance "
-            "[--stacked] (num rings) (ring size) "
-            "(initial token value) (repetitions)"
-         << endl
-         << endl;
+            "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS"
+         << endl << endl;
     exit(1);
 }
 
-void run(int num_rings, int ring_size,
-         int initial_token_value, int repetitions) {
+int main(int argc, char** argv) {
+  if (argc != 5) {
+    usage();
+  }
+  int num_rings;
+  int ring_size;
+  int initial_token_value;
+  int repetitions;
+  try {
+    num_rings           = stoi(argv[1]);
+    ring_size           = stoi(argv[2]);
+    initial_token_value = stoi(argv[3]);
+    repetitions         = stoi(argv[4]);
+  }
+  catch (std::exception&) {
+    usage();
+  }
   int num_msgs = num_rings + (num_rings * repetitions);
   auto sv = spawn<supervisor>(num_msgs);
   std::vector<actor> masters; // of the universe
@@ -186,18 +199,6 @@ void run(int num_rings, int ring_size,
     masters.push_back(spawn<chain_master>(sv));
     anon_send(masters.back(), atom("init"), ring_size,
               initial_token_value, repetitions);
-  }
-}
-
-int main(int argc, char** argv) {
-  if (argc != 5) {
-    usage();
-  }
-  try {
-    run(stoi(argv[1]), stoi(argv[2]), stoi(argv[3]), stoi(argv[4]));
-  }
-  catch (std::exception&) {
-    usage();
   }
   await_all_actors_done();
 }

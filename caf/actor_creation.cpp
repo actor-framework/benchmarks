@@ -74,16 +74,14 @@ int main(int argc, char** argv) {
   if (argc != 2) {
     usage();
   }
-  int num;
   try {
-    num = std::stoi(argv[1]);
+    s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   }
   catch (std::exception&) {
     cerr << "invalid argument: " << argv[1];
     usage();
   }
-  s_num = static_cast<uint32_t>(num);
-  anon_send(spawn(testee, invalid_actor), atom("spread"), num);
+  anon_send(spawn(testee, invalid_actor), atom("spread"), s_num);
   await_all_actors_done();
   shutdown();
 }
