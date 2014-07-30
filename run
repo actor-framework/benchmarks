@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# $1:   cppa|scala|erlang
+# $1:   caf|scala|erlang
 # $bench:   mixed_case|actor_creation|mailbox_performance|distributed
 # $...: args
 
 usage="\
-usage: $0 (cppa|scala|erlang) (mixed_case|actor_creation|mailbox_performance|distributed)
+usage: $0 (caf|scala|erlang) (mixed_case|actor_creation|mailbox_performance|distributed)
 "
 
 if [[ $# < 2 ]]; then
@@ -25,11 +25,11 @@ bench="$2"
 shift;shift
 
 case "$impl" in
-  cppa)
+  caf)
     cmd="./$bench $@"
     ;;
   scala)
-    cmd="scala org.libcppa.$bench $@"
+    cmd="scala org.caf.$bench $@"
     ;;
   erlang)
     cmd="erl -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
@@ -46,7 +46,7 @@ case "$impl" in
     ;;
 esac
 
-cd bin
+cd build/bin
 export JAVA_OPTS="-Xmx4096M"
 if [[ $(uname) == "Darwin" ]] ; then
   /usr/bin/time -p $cmd 2>&1 | awk '/real/ {print $2}'
