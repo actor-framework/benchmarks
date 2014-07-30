@@ -113,3 +113,12 @@ endmacro()
 add_caf_benchmark(actor_creation)
 add_caf_benchmark(mailbox_performance)
 add_caf_benchmark(mixed_case)
+
+
+################################################################################
+#                                    tools                                     #
+################################################################################
+
+add_executable(caf_run_bench ${CMAKE_CURRENT_SOURCE_DIR}/caf_run_bench.cpp)
+target_link_libraries(caf_run_bench ${LIBCAF_LIBRARIES} ${LD_FLAGS})
+add_dependencies(all_benchmarks caf_run_bench)
