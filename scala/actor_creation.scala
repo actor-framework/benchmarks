@@ -1,6 +1,6 @@
-package org.libcppa
+package org.caf
 
-import org.libcppa.utility._
+import org.caf.utility._
 
 import akka.actor._
 
