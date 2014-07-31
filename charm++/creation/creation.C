@@ -3,17 +3,6 @@
 #include "charm++.h"
 #include "creation.decl.h"
 
-
-class spread_token : public CMessage_spread_token { 
- public:
-  int value;
-};
-
-class result_token : public CMessage_result_token {
- public:
-  int result;
-};
-
 struct main : public CBase_main {
    void usage() {
      using namespace std;

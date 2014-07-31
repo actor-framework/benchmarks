@@ -1,9 +1,6 @@
 
 mainmodule creation {
 
-  message spread_token;
-  message result_token; 
-
   mainchare main {
     entry main(CkArgMsg*);
   };
