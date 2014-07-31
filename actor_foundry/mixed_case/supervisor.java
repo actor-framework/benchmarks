@@ -7,7 +7,7 @@ import osl.manager.annotations.message;
 import java.util.Vector;
 
 public class supervisor extends Actor {
-  private static final boolean DEBUG         = true;
+  private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4521476353751326142L;
   public  static final      String _CLASS    =
                               "osl.examples.caf_benches.mixed_case.supervisor";
@@ -42,7 +42,7 @@ public class supervisor extends Actor {
   private void check_factors(Vector<Long> vec) {
     if (vec.size() == 2 && vec.get(0) == mainactor.s_factor1
         && vec.get(1) == mainactor.s_factor2) {
-      send(stdout, "println", "OKAY");
+      //send(stdout, "println", "OKAY");
     } else {
       send(stdout, "println", "ERROR");
     }

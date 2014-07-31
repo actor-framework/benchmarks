@@ -5,7 +5,7 @@ import osl.util.*;
 import osl.manager.annotations.message;
 
 public class chain_master extends Actor {
-  private static final boolean DEBUG         = true;
+  private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578541365981326142L;
   public  static final      String _CLASS    =
                               "osl.examples.caf_benches.mixed_case.chain_master";

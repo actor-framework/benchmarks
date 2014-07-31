@@ -7,7 +7,7 @@ import osl.manager.annotations.message;
 import java.util.Vector;
 
 public class worker extends Actor {
-  private static final boolean DEBUG         = true;
+  private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578547896541465872L;
   public  static final      String _CLASS    =
                               "osl.examples.caf_benches.mixed_case.worker";
@@ -34,7 +34,6 @@ public class worker extends Actor {
 
   private Vector<Long> factorize(Long n) {
     Vector<Long> result = new Vector<Long>();
-
     if (n <= 3) {
       result.add(n);
       return result;
