@@ -21,7 +21,6 @@ public class chain_link extends Actor {
   @message
   public void token(Integer v) {
     if (DEBUG) send(stdout, "println", "chain_link::token");
-    if (chain_master.chain_master_instance == m_next) send(stdout, "println", "I should send to master... " + m_next.toString() + " V: " + v.toString());
     send(m_next, "token", v);
     if (v == 0) {
       destroy("done");

@@ -17,10 +17,10 @@ public class testactor extends Actor {
   private        int       m_r2     = 0;
 
   @message
-  public void boot(Integer num) throws RemoteCodeException {
-    s_num  = num.intValue();
+  public void boot(String in) throws RemoteCodeException {
+    s_num  = Integer.parseInt(in.split("_")[1]);
     master = self();
-    send(master, "spread", master, num);
+    send(master, "spread", master, s_num);
   }
 
   @message
