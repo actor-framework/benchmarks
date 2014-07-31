@@ -25,7 +25,7 @@ namespace { decltype(chrono::system_clock::now()) s_start; }
 
 #ifdef __APPLE__
 template <class OutStream>
-bool print_vsize(OutStream& out, const string&, pid_t child) {
+bool print_rss(OutStream& out, string&, const string&, pid_t child) {
   task_t child_task;
   if (task_for_pid(mach_task_self(), child, &child_task) != KERN_SUCCESS) {
     return false;
@@ -35,13 +35,35 @@ bool print_vsize(OutStream& out, const string&, pid_t child) {
   if (task_info(child_task, TASK_BASIC_INFO, (task_info_t) &basic_info, &count) != KERN_SUCCESS) {
     return false;
   }
+  auto rss = static_cast<unsigned long long>(basic_info.resident_size);
+  auto rss_kb = rss / 1024;
   // type is mach_vm_size_t
   out << chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start).count()
       << " "
-      << static_cast<unsigned long long>(basic_info.resident_size) << endl;
+      << rss_kb << endl;
   return true;
 }
+#elif defined(__linux__)
+template <class OutStream>
+bool print_rss(OutStream& out, string& line, const string& proc_file, pid_t) {
+  ifstream statfile(proc_file);
+  while (getline(statfile, line)) {
+    if (line.compare(0, 6, "VmRSS:") == 0) {
+      auto first = line.c_str() + 6; // skip "VmRSS:"
+      auto rss = strtoll(first, NULL, 10);
+      if (line.compare(line.size() - 2, 2, "kB") != 0) {
+        cerr << "VmRSS is *NOT* in kB" << endl;
+      }
+      out << chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start).count()
+          << " "
+          << rss << endl;
+      return true;
+    }
+  }
+  return false;
+}
 #else
+# error OS not supported
 #endif
 
 void watchdog(blocking_actor* self, pid_t child, int max_runtime) {
@@ -57,11 +79,11 @@ void memrecord(blocking_actor* self, pid_t child, int poll_interval) {
   string fname = "/proc/";
   fname += std::to_string(child);
   fname += "/status";
-  //self->delayed_send(self, chrono::milliseconds(50), atom("poll"));
+  string line_buf;
   self->send(self, atom("poll"));
   self->receive_loop(
     on(atom("poll")) >> [&] {
-      print_vsize(cout, fname, child);
+      print_rss(cout, line_buf, fname, child);
       self->delayed_send(self, chrono::milliseconds(poll_interval), atom("poll"));
     }
   );
