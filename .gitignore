@@ -1,3 +1,4 @@
 Makefile
 build/*
 bin/*
+actor_foundry/lib_src/*
