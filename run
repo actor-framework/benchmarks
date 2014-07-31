@@ -1,15 +1,25 @@
 #!/bin/bash
 
-# $1:   caf|scala|erlang
-# $bench:   mixed_case|actor_creation|mailbox_performance|distributed
-# $...: args
+# configure this for your system
+classpath="/opt/local/share/scala-2.10/lib/scala-library.jar:/opt/local/share/scala-2.10/lib/akka-actors.jar:/opt/local/share/scala-2.10/lib/typesafe-config.jar"
 
 usage="\
-usage: $0 (caf|scala|erlang) (mixed_case|actor_creation|mailbox_performance|distributed)
+usage: $0 USERID BIN_PATH IMPL BENCH
+
+  USERID:   ID of the user the benchmark should run (script needs root access)
+  BIN_PATH: path to CAF binaries
+  IMPL:     (caf|scala|erlang)
+  BENCH:    (mixed_case|actor_creation|mailbox_performance)
+
 "
 
-if [[ $# < 2 ]]; then
+if [[ $# < 4 ]]; then
   echo "too few arguments"; echo; echo "$usage"
+  exit
+fi
+
+if [[ $(id -u) != 0 ]]; then
+  echo "need to be root"; echo; echo "$usage"
   exit
 fi
 
@@ -20,25 +30,28 @@ else
 fi
 
 cmd=""
+username="$1"
+userid=$(id -u $username)
+shift
+binpath="$1"
+shift
 impl="$1"
-bench="$2"
-shift;shift
+shift
+bench="$1"
+shift
+
+java_cmd=$(which java)
+erl_cmd=$(which erl)
 
 case "$impl" in
   caf)
-    cmd="./$bench $@"
+    cmd="$binpath/$bench $@"
     ;;
   scala)
-    cmd="scala org.caf.$bench $@"
+    cmd="$java_cmd -cp $binpath:$classpath org.caf.$bench $@"
     ;;
   erlang)
-    cmd="erl -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
-    ;;
-  theron)
-    cmd="./theron_$bench $@"
-    ;;
-  go)
-    cmd="./go/$bench $@"
+    cmd="$erl_cmd -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
     ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"
@@ -46,11 +59,8 @@ case "$impl" in
     ;;
 esac
 
-cd build/bin
-export JAVA_OPTS="-Xmx4096M"
-if [[ $(uname) == "Darwin" ]] ; then
-  /usr/bin/time -p $cmd 2>&1 | awk '/real/ {print $2}'
-else
-  /usr/bin/time -p -f "%e" $cmd 2>&1
-fi
-cd ..
+olddir=$PWD
+cd "$binpath"
+export JAVA_OPTS="-Xmx40960M"
+./caf_run_bench $userid 3600 75 $cmd
+cd "$olddir"
