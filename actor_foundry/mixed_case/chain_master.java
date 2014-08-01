@@ -1,4 +1,4 @@
-package osl.examples.caf_benches.mixed_case;
+package osl.examples.caf_benches;
  
 import osl.manager.*;
 import osl.util.*;
@@ -8,7 +8,7 @@ public class chain_master extends Actor {
   private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578541365981326142L;
   public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.mixed_case.chain_master";
+                              "osl.examples.caf_benches.chain_master";
   public  static ActorName chain_master_instance = null;
 
   private int       m_iteration;
@@ -53,7 +53,7 @@ public class chain_master extends Actor {
 
   private void new_ring(int ring_size, int initial_token_value)
                         throws RemoteCodeException {
-    send(m_factorizer, "calc", mainactor.s_task_n);
+    send(m_factorizer, "calc", mixed_case.s_task_n);
     ActorName temp = self(); // temp...
     for (int i = 1; i < ring_size; ++i) {
       m_next = create(chain_link._CLASS);

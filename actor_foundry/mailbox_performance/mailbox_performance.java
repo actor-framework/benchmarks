@@ -1,4 +1,4 @@
-package osl.examples.caf_benches.mailbox_performance;
+package osl.examples.caf_benches;
 
 // bei error:
 // 1.) ant clean
@@ -12,10 +12,10 @@ import osl.manager.*;
 import osl.util.*;
 import osl.manager.annotations.message;
 
-public class mailbox extends Actor {
+public class mailbox_performance extends Actor {
   private static final long serialVersionUID = 4272570623748766142L;
   public  static final String _CLASS =
-                        "osl.examples.caf_benches.mailbox_performance.mailbox";
+                        "osl.examples.caf_benches.mailbox_performance";
 
   @message
   public void boot(String in) throws RemoteCodeException {

@@ -1,4 +1,4 @@
-package osl.examples.caf_benches.mixed_case;
+package osl.examples.caf_benches;
  
 import osl.manager.*;
 import osl.util.*;
@@ -8,7 +8,7 @@ public class chain_link extends Actor {
   private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578547894020479372L;
   public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.mixed_case.chain_link";
+                              "osl.examples.caf_benches.chain_link";
 
   private ActorName m_next;
   

@@ -1,4 +1,4 @@
-package osl.examples.caf_benches.mixed_case;
+package osl.examples.caf_benches;
  
 import osl.manager.*;
 import osl.util.*;
@@ -10,7 +10,7 @@ public class worker extends Actor {
   private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578547896541465872L;
   public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.mixed_case.worker";
+                              "osl.examples.caf_benches.worker";
 
   private ActorName m_mc = null;
   

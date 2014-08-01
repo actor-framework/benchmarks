@@ -1,14 +1,14 @@
 //java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.actor_creation.testactor boot 20
-package osl.examples.caf_benches.actor_creation;
+package osl.examples.caf_benches;
 
 import osl.manager.*;
 import osl.util.*;
 import osl.manager.annotations.message;
 
-public class testactor extends Actor {
+public class actor_creation extends Actor {
   private static final long serialVersionUID = 4273990623751326142L;
   private static final String _CLASS =
-                           "osl.examples.caf_benches.actor_creation.testactor";
+                           "osl.examples.caf_benches.actor_creation";
   private static int       s_num    = 0;
   private static ActorName master   = null;  /* master actor */
   private static int       m_reach  = 0;

@@ -1,5 +1,5 @@
 // java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart  osl.examples.caf_benches.mixed_case.mainactor boot "_1_10_30_1"
-package osl.examples.caf_benches.mixed_case;
+package osl.examples.caf_benches;
  
 import osl.manager.*;
 import osl.util.*;
@@ -7,11 +7,11 @@ import osl.manager.annotations.message;
 
 import java.util.Vector;
 
-public class mainactor extends Actor {
+public class mixed_case extends Actor {
   private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4277890623751326142L;
   public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.mixed_case.mainactor";
+                              "osl.examples.caf_benches.mixed_case";
   public  static final long s_factor1        = 86028157;
   public  static final long s_factor2        = 329545133;
   public  static final long s_task_n         = s_factor1 * s_factor2;

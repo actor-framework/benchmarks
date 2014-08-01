@@ -1,4 +1,4 @@
-package osl.examples.caf_benches.mailbox_performance;
+package osl.examples.caf_benches;
 
 import osl.manager.*;
 import osl.util.*;
@@ -7,7 +7,7 @@ import osl.manager.annotations.message;
 public class receiver extends Actor {
   private static final long serialVersionUID = 4578965423751326142L;
   public  static final String _CLASS =
-                       "osl.examples.caf_benches.mailbox_performance.receiver";
+                       "osl.examples.caf_benches.receiver";
   private              long   m_max;
   private              long   m_value;
 

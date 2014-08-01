@@ -1,4 +1,4 @@
-package osl.examples.caf_benches.mixed_case;
+package osl.examples.caf_benches;
  
 import osl.manager.*;
 import osl.util.*;
@@ -10,7 +10,7 @@ public class supervisor extends Actor {
   private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4521476353751326142L;
   public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.mixed_case.supervisor";
+                              "osl.examples.caf_benches.supervisor";
   private static ActorName instance = null;
 
   private int m_left = 0;
@@ -40,8 +40,8 @@ public class supervisor extends Actor {
   }
 
   private void check_factors(Vector<Long> vec) {
-    if (vec.size() == 2 && vec.get(0) == mainactor.s_factor1
-        && vec.get(1) == mainactor.s_factor2) {
+    if (vec.size() == 2 && vec.get(0) == mixed_case.s_factor1
+        && vec.get(1) == mixed_case.s_factor2) {
       //send(stdout, "println", "OKAY");
     } else {
       send(stdout, "println", "ERROR");

@@ -3,12 +3,15 @@
 # configure this for your system
 classpath="/opt/local/share/scala-2.10/lib/scala-library.jar:/opt/local/share/scala-2.10/lib/akka-actors.jar:/opt/local/share/scala-2.10/lib/typesafe-config.jar"
 
+# classpath for ActorFoundry
+classpath_foundry="actor_foundry/lib_src/lib/foundry-1.0.jar:actor_foundry/lib_src/classes"
+
 usage="\
 usage: $0 USERID BIN_PATH IMPL BENCH
 
   USERID:   ID of the user the benchmark should run (script needs root access)
   BIN_PATH: path to CAF binaries
-  IMPL:     (caf|scala|erlang)
+  IMPL:     (caf|scala|erlang|foundry)
   BENCH:    (mixed_case|actor_creation|mailbox_performance)
 
 "
@@ -52,6 +55,11 @@ case "$impl" in
     ;;
   erlang)
     cmd="$erl_cmd -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
+    ;;
+  foundry)
+    modified_args=\"$(echo "_$@" | tr ' ' _)\"
+    cmd="$java_cmd -cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
+    echo $cmd
     ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"
