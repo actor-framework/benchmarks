@@ -59,7 +59,6 @@ case "$impl" in
   foundry)
     modified_args=\"$(echo "_$@" | tr ' ' _)\"
     cmd="$java_cmd -cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
-    echo $cmd
     ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"
