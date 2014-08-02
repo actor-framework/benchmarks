@@ -66,7 +66,13 @@ bool print_rss(OutStream& out, string& line, const string& proc_file, pid_t) {
 # error OS not supported
 #endif
 
-void watchdog(blocking_actor* self, pid_t child, int max_runtime) {
+void watchdog(blocking_actor* self, int max_runtime) {
+  pid_t child;
+  self->receive(
+    on(atom("go"), arg_match) >> [&](pid_t child_pid) {
+      child = child_pid;
+    }
+  );
   self->delayed_send(self, chrono::seconds(max_runtime), atom("TimeIsUp"));
   self->receive(
     on(atom("TimeIsUp")) >> [=] {
@@ -75,22 +81,30 @@ void watchdog(blocking_actor* self, pid_t child, int max_runtime) {
   );
 }
 
-void memrecord(blocking_actor* self, pid_t child, int poll_interval) {
+void memrecord(blocking_actor* self, int poll_interval, std::ostream& out) {
   string fname = "/proc/";
+  string line_buf;
+  pid_t child;
+  self->receive(
+    on(atom("go"), arg_match) >> [&](pid_t child_pid) {
+      child = child_pid;
+    }
+  );
   fname += std::to_string(child);
   fname += "/status";
-  string line_buf;
   self->send(self, atom("poll"));
   self->receive_loop(
     on(atom("poll")) >> [&] {
-      print_rss(cout, line_buf, fname, child);
       self->delayed_send(self, chrono::milliseconds(poll_interval), atom("poll"));
+      print_rss(out , line_buf, fname, child);
     }
   );
 }
 
 void usage() {
-  cout << "usage: caf_run_bench USERID MAX_RUNTIME_IN_SEC MEM_POLL_INTERVAL_IN_MS PROGRAM ARGS..."
+  cout << "usage: caf_run_bench USERID MAX_RUNTIME_IN_SEC "
+          "MEM_POLL_INTERVAL_IN_MS RUNTIME_OUT_FILE MEM_OUT_FILE "
+          "PROGRAM ARGS..."
        << endl;
   exit(1);
 }
@@ -106,13 +120,30 @@ int rd_int(const char* cstr) {
 }
 
 int main(int argc, char** argv) {
-  if (argc < 5) {
+  if (argc < 7) {
     usage();
   }
   int userid = rd_int(argv[1]);
   int max_runtime = rd_int(argv[2]);
   int poll_interval = rd_int(argv[3]);
-  cout << "fork into " << argv[4] << endl;
+  string runtime_out_fname = argv[4];
+  string mem_out_fname = argv[5];
+  std::fstream runtime_out{runtime_out_fname, ios_base::out | ios_base::app};
+  std::fstream mem_out{mem_out_fname, ios_base::out};
+  std::ostringstream mem_out_buf;
+  if (!runtime_out) {
+    cerr << "unable to open file for runtime output: " << runtime_out_fname << endl;
+    return 1;
+  }
+  if (!mem_out) {
+    cerr << "unable to open file for memory output: " << mem_out_fname << endl;
+    return 1;
+  }
+  // start background workers
+  auto dog = spawn<detached + blocking_api>(watchdog, max_runtime);
+  auto rec = spawn<detached + blocking_api>(memrecord, poll_interval,
+                                            std::ref(mem_out_buf));
+  cout << "fork into " << argv[6] << endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
     throw std::logic_error("fork failed");
@@ -124,7 +155,7 @@ int main(int argc, char** argv) {
       exit(1);
     }
     // skip path to app, userid, max runtime, and poll interval
-    auto first = argv + 4;
+    auto first = argv + 6;
     auto last = first + argc;
     vector<char*> arr;
     copy(first, last, back_inserter(arr));
@@ -134,8 +165,9 @@ int main(int argc, char** argv) {
     // should be unreachable
     throw std::logic_error("execv failed");
   }
-  auto dog = spawn<detached + blocking_api>(watchdog, child_pid, max_runtime);
-  auto rec = spawn<detached + blocking_api>(memrecord, child_pid, poll_interval);
+  auto msg = make_message(atom("go"), child_pid);
+  anon_send(dog, msg);
+  anon_send(rec, msg);
   int child_exit_status = 0;
   wait(&child_exit_status);
   auto duration = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start);
@@ -145,4 +177,9 @@ int main(int argc, char** argv) {
   cout << "program did run for " << duration.count() << "ms" << endl;
   await_all_actors_done();
   shutdown();
+  if (child_exit_status == 0) {
+    runtime_out << duration.count() << endl;
+    mem_out << mem_out_buf.str() << flush;
+  }
+  return child_exit_status;
 }
