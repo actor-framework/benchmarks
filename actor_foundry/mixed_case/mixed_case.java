@@ -1,4 +1,3 @@
-// java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart  osl.examples.caf_benches.mixed_case.mainactor boot "_1_10_30_1"
 package osl.examples.caf_benches;
  
 import osl.manager.*;
@@ -8,7 +7,6 @@ import osl.manager.annotations.message;
 import java.util.Vector;
 
 public class mixed_case extends Actor {
-  private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4277890623751326142L;
   public  static final      String _CLASS    =
                               "osl.examples.caf_benches.mixed_case";
@@ -35,12 +33,6 @@ public class mixed_case extends Actor {
     m_ring_size           = Integer.parseInt(args[2]);
     m_initial_token_value = Integer.parseInt(args[3]);
     m_repetitions         = Integer.parseInt(args[4]);
-    if (DEBUG) {
-      send(stdout, "println", "m_num_rings: "     + m_num_rings);
-      send(stdout, "println", "m_ring_size: "     + m_ring_size);
-      send(stdout, "println", "m_initial_token: " + m_initial_token_value);
-      send(stdout, "println", "m_repetitions: "   + m_repetitions);
-    }
     int num_msgs = m_num_rings + (m_num_rings * m_repetitions);
     ActorName sv = create(supervisor._CLASS);
     send(sv, "init", num_msgs);

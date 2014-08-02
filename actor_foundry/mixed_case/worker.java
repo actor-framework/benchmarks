@@ -7,7 +7,6 @@ import osl.manager.annotations.message;
 import java.util.Vector;
 
 public class worker extends Actor {
-  private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578547896541465872L;
   public  static final      String _CLASS    =
                               "osl.examples.caf_benches.worker";
@@ -16,19 +15,16 @@ public class worker extends Actor {
   
   @message
   public void init(ActorName msgcollector) {
-    if (DEBUG) send(stdout, "println", "worker::init");
     m_mc = msgcollector;
   }
 
   @message
   public void calc(Long what) {
-    if (DEBUG) send(stdout, "println", "worker::calc");
     send(m_mc, "result", factorize(what));
   }
 
   @message
   public void done() {
-    if (DEBUG) send(stdout, "println", "worker::done");
     destroy("done");
   }
 

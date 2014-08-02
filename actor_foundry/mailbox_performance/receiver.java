@@ -20,7 +20,7 @@ public class receiver extends Actor {
   @message
   public void msg() {
     if (++m_value == m_max) {
-      // done... nothing...
+      destroy("done");
     }
   }
 }

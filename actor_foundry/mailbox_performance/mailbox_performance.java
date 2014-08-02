@@ -1,13 +1,5 @@
 package osl.examples.caf_benches;
 
-// bei error:
-// 1.) ant clean
-// 2.) ant compile
-// 3.) ant codegen
-// 4.) ant weave -k
-//java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.mailbox_performance.mailbox boot 20 1000
-//java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.mailbox_performance.mailbox boot "_20_1000000_"
-
 import osl.manager.*;
 import osl.util.*;
 import osl.manager.annotations.message;
@@ -19,8 +11,6 @@ public class mailbox_performance extends Actor {
 
   @message
   public void boot(String in) throws RemoteCodeException {
-    // _20_1000000_ = 20 senders, 1000000 msgs
-    //send(stdout, "println", "in: " + in);
     String[] splitted  = in.split("_");
     Integer num_sender = Integer.parseInt(splitted[1]);
     Long    num_msgs   = Long.parseLong(splitted[2]);

@@ -1,4 +1,3 @@
-//java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.actor_creation.testactor boot 20
 package osl.examples.caf_benches;
 
 import osl.manager.*;
@@ -29,7 +28,7 @@ public class actor_creation extends Actor {
     if(x == 1) {
       send(parent, "result", 1);
     } else {
-      final Integer msg = new Integer(x.intValue() - 1);
+      final Integer msg = x.intValue() - 1;
       ActorName child_1 = create(_CLASS);
       ActorName child_2 = create(_CLASS);
       send(child_1, "spread", self(), msg);
@@ -47,7 +46,7 @@ public class actor_creation extends Actor {
           /* 2 child actors refer to master actor, but we just wanna validate
              if we reached the master again
            */
-          send(m_parent, "result", new Integer(1 + m_r1 + m_r2));
+          send(m_parent, "result", 1 + m_r1 + m_r2);
           return;
         }
         final int result  = 2 + m_r1 + m_r2;
@@ -57,7 +56,7 @@ public class actor_creation extends Actor {
                " found: " + result);
         }
       } else  {
-        send(m_parent, "result", new Integer(1 + m_r1 + m_r2));
+        send(m_parent, "result", 1 + m_r1 + m_r2);
       }
     }
   }

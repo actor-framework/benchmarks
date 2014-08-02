@@ -22,9 +22,9 @@ Obtain the sources and untar them
 Move the files
 --------------
     ~ # mkdir lib_src/src/osl/examples/caf_benches
-    ~ # cp -r actor_creation lib_src/src/osl/examples/caf_benches 
-    ~ # cp -r mailbox_performance lib_src/src/osl/examples/caf_benches
-    ~ # cp -r mixed_case lib_src/src/osl/examples/caf_benches
+    ~ # cp actor_creation/* lib_src/src/osl/examples/caf_benches
+    ~ # cp mailbox_performance/* lib_src/src/osl/examples/caf_benches
+    ~ # cp mixed_case/* lib_src/src/osl/examples/caf_benches
 
 Build the sources
 -----------------

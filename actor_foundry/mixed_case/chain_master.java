@@ -5,7 +5,6 @@ import osl.util.*;
 import osl.manager.annotations.message;
 
 public class chain_master extends Actor {
-  private static final boolean DEBUG         = false;
   private static final long serialVersionUID = 4578541365981326142L;
   public  static final      String _CLASS    =
                               "osl.examples.caf_benches.chain_master";
@@ -24,7 +23,6 @@ public class chain_master extends Actor {
   public void init(ActorName msgcollector, Integer ring_size,
                    Integer initial_token, Integer repetitions) 
                    throws RemoteCodeException {
-    if (DEBUG) send(stdout, "println", "chain_master::init");
     chain_master_instance = self();
     m_iteration     = 0;
     m_mc            = msgcollector;
@@ -38,7 +36,6 @@ public class chain_master extends Actor {
 
   @message
   public void token(Integer y) throws RemoteCodeException {
-    if (DEBUG) send(stdout, "println", "chain_master::token");
     if (y == 0) {
       if (++m_iteration < m_repetitions) {
         new_ring(m_ring_size, m_initial_token);
@@ -47,7 +44,7 @@ public class chain_master extends Actor {
         send(m_mc, "masterdone");
       }
     } else {
-      send(m_next, "token", new Integer(y.intValue() - 1));
+      send(m_next, "token", y.intValue() - 1);
     }
   }
 
@@ -60,6 +57,6 @@ public class chain_master extends Actor {
       send(m_next, "init", temp);
       temp = m_next;
     }
-    send(m_next, "token", new Integer(initial_token_value));
+    send(m_next, "token", initial_token_value);
   }
 }
