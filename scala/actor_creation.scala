@@ -7,10 +7,6 @@ import akka.actor._
 case class Spread(value: Int)
 case class Result(value: Int)
 
-object static_vars {
-  var cmdline_arg = 0
-}
-
 class Testee(parent: ActorRef) extends Actor {
   def receive = {
     case Spread(1) =>
@@ -26,15 +22,17 @@ class Testee(parent: ActorRef) extends Actor {
             case Result(r2) =>
               if (parent == null) {
                 val res = 2 + r1 + r2;
-                val expected = (1 << static_vars.cmdline_arg)
+                val expected = (1 << s)
                 if (res != expected) {
                   Console.println("Expected " + expected + ", found " + res)
                   System.exit(42)
                 }
+                context.stop(self)
+                global_latch countDown
               } else {
                 parent ! Result(1 + r1 + r2)
+                context.stop(self)
               }
-              context.stop(self)
             }
           }
   }
@@ -46,7 +44,6 @@ object actor_creation {
   }
   def main(args: Array[String]): Unit = args match {
     case Array(IntStr(n)) => {
-      static_vars.cmdline_arg = n;
       val system = ActorSystem()
       system.actorOf(Props(new Testee(null))) ! Spread(n)
       global_latch.await
