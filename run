@@ -10,7 +10,7 @@ mem_poll_interval_ms=50
 max_trials=3
 
 # configure this for your system
-classpath="/opt/local/share/scala-2.10/lib/scala-library.jar:/opt/local/share/scala-2.10/lib/akka-actors.jar:/opt/local/share/scala-2.10/lib/typesafe-config.jar"
+scala_home=/opt/local/share/scala-2.10
 
 # classpath for ActorFoundry
 classpath_foundry="actor_foundry/lib_src/lib/foundry-1.0.jar:actor_foundry/lib_src/classes"
@@ -59,7 +59,10 @@ case "$impl" in
     cmd="$binpath/$bench $@"
     ;;
   scala)
-    cmd="$java_cmd -cp $binpath:$classpath org.caf.$bench $@"
+    scala_lib="$scala_home/lib"
+    jvm_tuning="-Xmx10240M -Xms32M"
+    scala_tuning="-Xbootclasspath/a:$scala_lib/akka-actors.jar:$scala_lib/jline.jar:$scala_lib/scala-actors-migration.jar:$scala_lib/scala-actors.jar:$scala_lib/scala-compiler.jar:$scala_lib/scala-library.jar:$scala_lib/scala-reflect.jar:$scala_lib/scala-swing.jar:$scala_lib/scalap.jar:$scala_lib/typesafe-config.jar -classpath "" -Dscala.home=$scala_home -Dscala.usejavacp=true scala.tools.nsc.MainGenericRunner"
+    cmd="$java_cmd $jvm_tuning $scala_tuning org.caf.$bench $@"
     ;;
   erlang)
     cmd="$erl_cmd -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
