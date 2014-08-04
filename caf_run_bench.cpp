@@ -1,3 +1,4 @@
+#include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -152,6 +153,14 @@ int main(int argc, char** argv) {
   if (child_pid == 0) {
     if (setuid(userid) != 0) {
       cerr << "could not set userid to " << userid << endl;
+      exit(1);
+    }
+    // make sure $HOME is set properly (evaluated by Erlang)
+    auto pw = getpwuid(userid);
+    std::string env_cmd = "HOME=";
+    env_cmd += pw->pw_dir;
+    if (putenv(&env_cmd[0]) != 0) {
+      cerr << "could net set HOME to " << pw->pw_dir << endl;
       exit(1);
     }
     // skip path to app, userid, max runtime, and poll interval
