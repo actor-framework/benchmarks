@@ -166,7 +166,7 @@ class supervisor : public event_based_actor{
 };
 
 void usage() {
-    cout << "usage: mailbox_performance "
+    cout << "usage: mixed_case"
             "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS"
          << endl << endl;
     exit(1);

@@ -1,0 +1,83 @@
+
+mainmodule mixed_case {
+
+  readonly uint64_t s_factor1;
+  readonly uint64_t s_factor2;
+  readonly uint64_t s_task_n;
+
+  mainchare main {
+    entry main(CkArgMsg*);
+  };
+//
+  chare supervisor {
+    entry supervisor(int num_msgs);
+    entry void result(const std::vector<uint64_t>& vec) {
+      atomic {
+        check_factors(vec);
+        --m_left;
+        if(debug) std::cout << "sv: result (" << m_left 
+                            << ")." << std::endl;
+      }
+      if(m_left == 0) {
+        atomic {
+          CkExit();
+        }
+      }
+    };
+    entry void masterdone() {
+      atomic {
+        --m_left;
+      }
+      if(m_left == 0) {
+        atomic {
+          if(debug) std::cout << "sv: master (" << m_left 
+                              << ")." << std::endl;
+          CkExit();
+        }
+      }
+    };
+  };
+
+  chare chain_master {
+    entry chain_master(CProxy_supervisor sv);
+    entry void init(int rs, int itv, int n) {
+      atomic {
+        m_n   = n;
+        m_itv = itv;
+        m_rs  = rs;
+        //CProxy_worker m_worker = CProxy_worker::ckNew(m_sv);
+        m_itr = 0;
+        new_ring();
+      }
+    };
+    entry void token(int value);
+    entry void new_ring() {
+      atomic {
+      if (debug) std::cout << "Creating new ring size: " << m_rs << std::endl;
+      m_worker.calc(s_task_n);
+      m_next = CProxy_chain_link::ckNew(thisProxy, std::string("56"));
+      std::vector<CProxy_chain_link> chain_links;
+      chain_links.push_back(m_next);
+      for(int i = 2; i < m_rs; ++i) {
+        if(debug) std:: cout << i << std::endl;
+        m_next = CProxy_chain_link::ckNew(chain_links.back(), "link");
+        chain_links.push_back(m_next);
+      }
+      m_next.token(m_itv);
+      if (debug) std::cout << "ring created " << std::endl;
+      }
+    };
+  };
+
+  chare worker {
+    entry worker(CProxy_supervisor sv);
+    entry void calc(uint64_t what);
+    entry void done();
+  };
+
+  chare chain_link {
+    entry chain_link(CProxy_chain_link next, std::string);
+    entry chain_link(CProxy_chain_master next, std::string);
+    entry void token(int value);
+  };
+};
