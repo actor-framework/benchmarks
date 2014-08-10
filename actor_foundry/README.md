@@ -39,10 +39,10 @@ Usage
 -----
 Assuming you are still in the `lib_src` folder
 
-* `java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.actor_creation.testactor boot "_20"` spawns 2^20 actors
+* `java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.actor_creation boot "_20"` spawns 2^20 actors
 
-* `java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.mailbox_performance.mailbox boot "_20_1000000"` spawn 20 sender which will send 1000000 messages each
+* `java -cp lib/foundry-1.0.jar:classes osl.examples.caf_benches.mailbox_performance boot "_20_1000000"` spawn 20 sender which will send 1000000 messages each
 
-* `java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osk.examples.caf_benches.mixed_case.mainactor "_1_10_30_1"` will spawn 1 ring, each ring with 10 chains, 30 as initial token and 1 repetition
+* `java -cp lib/foundry-1.0.jar:classes osl.foundry.FoundryStart osl.examples.caf_benches.mixed_case "_1_10_30_1"` will spawn 1 ring, each ring with 10 chains, 30 as initial token and 1 repetition
 
 [ActorFoundry Website](http://osl.cs.illinois.edu/software/actor-foundry/ "ActorFoundry Website")
