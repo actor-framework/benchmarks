@@ -26,8 +26,7 @@ public class chain_master extends Actor {
     chain_master_instance = self();
     m_iteration     = 0;
     m_mc            = msgcollector;
-    m_factorizer    = create(worker._CLASS);
-    send(m_factorizer, "init", m_mc);
+    m_factorizer    = create(worker._CLASS, m_mc);
     m_ring_size     = ring_size;
     m_initial_token = initial_token;
     m_repetitions   = repetitions;
@@ -53,8 +52,7 @@ public class chain_master extends Actor {
     send(m_factorizer, "calc", mixed_case.s_task_n);
     ActorName temp = self(); // temp...
     for (int i = 1; i < ring_size; ++i) {
-      m_next = create(chain_link._CLASS);
-      send(m_next, "init", temp);
+      m_next = create(chain_link._CLASS, temp);
       temp = m_next;
     }
     send(m_next, "token", initial_token_value);

@@ -12,9 +12,9 @@ public class worker extends Actor {
                               "osl.examples.caf_benches.worker";
 
   private ActorName m_mc = null;
-  
-  @message
-  public void init(ActorName msgcollector) {
+
+  public worker(ActorName msgcollector) {
+    super();
     m_mc = msgcollector;
   }
 

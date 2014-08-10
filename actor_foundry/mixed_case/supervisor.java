@@ -13,9 +13,9 @@ public class supervisor extends Actor {
 
   private int m_left = 0;
 
-  @message
-  public void init(Integer left) {
-    m_left = left.intValue();
+  public supervisor(Integer left) {
+    super();
+    m_left = left;
   }
   
   @message

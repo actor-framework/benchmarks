@@ -10,9 +10,9 @@ public class chain_link extends Actor {
                               "osl.examples.caf_benches.chain_link";
 
   private ActorName m_next;
-  
-  @message
-  public void init(ActorName next) {
+
+  public chain_link(ActorName next) {
+    super();
     m_next = next;
   }
 

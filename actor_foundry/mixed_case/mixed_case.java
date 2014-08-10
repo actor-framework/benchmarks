@@ -34,8 +34,7 @@ public class mixed_case extends Actor {
     m_initial_token_value = Integer.parseInt(args[3]);
     m_repetitions         = Integer.parseInt(args[4]);
     int num_msgs = m_num_rings + (m_num_rings * m_repetitions);
-    ActorName sv = create(supervisor._CLASS);
-    send(sv, "init", num_msgs);
+    ActorName sv = create(supervisor._CLASS, num_msgs);
     Vector<ActorName> masters = new Vector<ActorName>();
     for (int i = 0; i < m_num_rings; ++i) {
       masters.add(create(chain_master._CLASS));

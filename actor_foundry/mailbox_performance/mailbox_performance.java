@@ -14,8 +14,8 @@ public class mailbox_performance extends Actor {
     String[] splitted  = in.split("_");
     Integer num_sender = Integer.parseInt(splitted[1]);
     Long    num_msgs   = Long.parseLong(splitted[2]);
-    ActorName testee   = create(receiver._CLASS);
-    send(testee, "init", new Long(num_sender.intValue() * num_msgs.intValue()));
+    Long    max_msg    = new Long(num_sender.intValue() * num_msgs.intValue());
+    ActorName testee   = create(receiver._CLASS, max_msg);
     for (long i = 0; i < num_sender; ++i) {
       send(create(sender._CLASS), "run", testee, num_msgs);
     }
