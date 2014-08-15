@@ -61,6 +61,9 @@ case "$impl" in
   caf)
     cmd="$binpath/$bench $@"
     ;;
+  charm)
+    cmd="$binpath/charm_$bench +p $NumCores $@"
+    ;;
   scala)
     scala_lib="$scala_home/lib"
     jvm_tuning="-Xmx10240M -Xms32M"
