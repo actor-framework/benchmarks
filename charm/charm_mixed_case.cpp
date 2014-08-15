@@ -6,24 +6,12 @@
 #include <functional>
 
 #include "charm++.h"
-#include "mixed_case.decl.h"
+#include "charm_mixed_case.decl.h"
 
-
-typedef std::vector<uint64_t> factors;
 
 /*readonly*/ uint64_t s_factor1  = 86028157;
 /*readonly*/ uint64_t s_factor2  = 329545133;
 /*readonly*/ uint64_t s_task_n   = s_factor1 * s_factor2;
-
-inline void check_factors(const factors& vec) {
-  using namespace std;
-  assert(vec.size() == 2);
-  assert(vec[0] == s_factor1);
-  assert(vec[1] == s_factor2);
-# ifdef NDEBUG
-  static_cast<void>(vec);
-# endif
-}
 
 void factorize(std::vector<uint64_t>& result, uint64_t n) {
   if (n <= 3) {
@@ -58,32 +46,21 @@ struct main : public CBase_main {
     if (m->argc != 5) {
       usage();
     }
-    int num_rings;
-    int ring_size;
-    int initial_token_value;
-    int repetitions;
-    try {
-      num_rings           = atoi(m->argv[1]);
-      ring_size           = atoi(m->argv[2]);
-      initial_token_value = atoi(m->argv[3]);
-      repetitions         = atoi(m->argv[4]);
-    } catch(std::exception&) {
-      usage();
-    }
+    int num_rings = atoi(m->argv[1]);
+    int ring_size = atoi(m->argv[2]);
+    int initial_token_value = atoi(m->argv[3]);
+    int repetitions = atoi(m->argv[4]);
     delete m;
     int num_msgs = num_rings + (num_rings * repetitions);
     CProxy_supervisor sv = CProxy_supervisor::ckNew(num_msgs);
-    std::vector<CProxy_chain_master> masters;
     for (int i = 0; i < num_rings; ++i) {
       CProxy_chain_master master =
           CProxy_chain_master::ckNew(sv, ring_size,
                                      initial_token_value, repetitions);
       master.init();
-      masters.push_back(master);
     }
   }
 };
-
 
 class chain_master : public CBase_chain_master {
  public:
@@ -97,18 +74,20 @@ class chain_master : public CBase_chain_master {
   }
 
   void init() {
+    //std::cout << "master::init" << std::endl;
     factorizer = CProxy_worker::ckNew(mc);
-    iteration = 0;
     new_ring();
   }
 
   void token(int value) {
+    //std::cout << "master::token " << value << std::endl;
     if (value == 0) {
       if (++iteration < max_iterations) {
         new_ring();
       } else {
         factorizer.done();
         mc.masterdone();
+        delete this;
       }
     } else {
       next.token(value - 1);
@@ -117,55 +96,61 @@ class chain_master : public CBase_chain_master {
 
  private:
   void new_ring() {
+    // without the dummy elements, Charm++ tries to create an infinite
+    // number of link nodes for whatever reason
+    //std::cout << "master::new_ring(" << ring_size << ")" << std::endl;
     factorizer.calc(s_task_n);
-    CProxy_chain_link next = CProxy_chain_link::ckNew(thisProxy, 42);
+    // spawning the ring on a single PE boosts
+    // performance quite significantly
+    next = CProxy_chain_link::ckNew(thisProxy, 42, CkMyPe());
     for (int i = 2; i < ring_size; ++i) {
-      next = CProxy_chain_link::ckNew(next);
+      next = CProxy_chain_link::ckNew(next, 0.0, CkMyPe());
     }
+    //std::cout << "master -> next ! " << initial_token_value << std::endl;
     next.token(initial_token_value);
   }
 
-  int               iteration;
-  CProxy_chain_link next;
-  CProxy_worker     factorizer;
+  int iteration;
   CProxy_supervisor mc;
   int ring_size;
   int initial_token_value;
   int max_iterations;
+  CProxy_chain_link next;
+  CProxy_worker factorizer;
 };
 
 class supervisor : public CBase_supervisor {
  public:
-  supervisor(int num_msgs) : m_left(num_msgs) {
+  supervisor(int num_msgs) : left(num_msgs) {
     // nop
   }
 
   void masterdone() {
-    if (--m_left == 0) {
+    if (--left == 0) {
       CkExit();
     }
   }
 
-  void result(const factors&) {
-    if (--m_left == 0) {
+  void result(const std::vector<uint64_t>&) {
+    if (--left == 0) {
       CkExit();
     }
   }
 
  private:
-  int m_left;
+  int left;
 };
 
 class worker : public CBase_worker {
  public:
-  worker(CProxy_supervisor sv) : m_sv(sv) {
+  worker(CProxy_supervisor sv) : msgcollector(sv) {
     // nop
   }
 
   void calc(uint64_t what) {
     std::vector<uint64_t> result;
     factorize(result, what);
-    m_sv.result(result);
+    msgcollector.result(result);
   }
 
   void done() {
@@ -173,25 +158,27 @@ class worker : public CBase_worker {
   }
 
  private:
-  CProxy_supervisor m_sv;
+  CProxy_supervisor msgcollector;
 };
 
 class chain_link : public CBase_chain_link {
  public:
-  chain_link(CProxy_chain_link next) : m_next(next), m_next_is_master(false) {
+  chain_link(CProxy_chain_link next, double) : next_is_master(false), next(next) {
     // nop
+    //std::cout << "link::link(link)" << std::endl;
   }
 
-  chain_link(CProxy_chain_master next, int msg)
-      : m_next_master(next), m_next_is_master(true) {
+  chain_link(CProxy_chain_master next, int) : next_is_master(true), mnext(next) {
     // nop
+    //std::cout << "link::link(master)" << std::endl;
   }
 
   void token(int value) {
-    if (m_next_is_master) {
-      m_next_master.token(value);
+    //std::cout << "link::token " << value << " [" << std::boolalpha << next_is_master << "]" << std::endl;
+    if (next_is_master) {
+      mnext.token(value);
     } else {
-      m_next.token(value);
+      next.token(value);
     }
     if (value == 0) {
       delete this;
@@ -199,10 +186,9 @@ class chain_link : public CBase_chain_link {
   }
 
  private:
-
-  bool                m_next_is_master;
-  CProxy_chain_link   m_next;
-  CProxy_chain_master m_next_master;
+  bool                next_is_master;
+  CProxy_chain_link   next;
+  CProxy_chain_master mnext;
 };
 
-#include "mixed_case.def.h"
+#include "charm_mixed_case.def.h"

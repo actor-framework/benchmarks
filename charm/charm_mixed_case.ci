@@ -18,7 +18,7 @@ mainmodule charm_mixed_case {
     entry void done();
   };
   chare chain_link {
-    entry chain_link(CProxy_chain_link next);
+    entry chain_link(CProxy_chain_link next, double dummy);
     entry chain_link(CProxy_chain_master next, int dummy);
     entry void token(int value);
   };
