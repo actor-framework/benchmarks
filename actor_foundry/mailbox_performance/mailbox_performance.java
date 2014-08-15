@@ -6,8 +6,6 @@ import osl.manager.annotations.message;
 
 public class mailbox_performance extends Actor {
   private static final long serialVersionUID = 4272570623748766142L;
-//  public  static final String class =
-//                        "osl.examples.caf_benches.mailbox_performance";
 
   @message
   public void boot(String in) throws RemoteCodeException {

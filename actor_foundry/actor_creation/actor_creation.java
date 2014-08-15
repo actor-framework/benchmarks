@@ -6,8 +6,7 @@ import osl.manager.annotations.message;
 
 public class actor_creation extends Actor {
   private static final long serialVersionUID = 4273990623751326142L;
-  //private static final String class =
-  //                         "osl.examples.caf_benches.actor_creation";
+
   private static int       s_num    = 0;
   private static ActorName master   = null;  /* master actor */
   private static int       m_reach  = 0;
@@ -27,11 +26,11 @@ public class actor_creation extends Actor {
     m_parent = parent;
     if(x == 1) {
       send(parent, "result", 1);
-      destroy("done");
+      //destroy("done");
     } else {
       final Integer msg = x.intValue() - 1;
-      ActorName child_1 = create(class);
-      ActorName child_2 = create(class);
+      ActorName child_1 = create(actor_creation.class);
+      ActorName child_2 = create(actor_creation.class);
       send(child_1, "spread", self(), msg);
       send(child_2, "spread", self(), msg);
     }
