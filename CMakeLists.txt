@@ -119,6 +119,12 @@ add_caf_benchmark(mixed_case)
 #                                    tools                                     #
 ################################################################################
 
+find_package(Boost)
+if(Boost_FOUND)
+  include_directories(${Boost_INCLUDE_DIRS})
+  add_executable(to_dat ${CMAKE_CURRENT_SOURCE_DIR}/tools/to_dat.cpp)
+  target_link_libraries(to_dat ${LD_FLAGS})
+endif()
 add_executable(caf_run_bench ${CMAKE_CURRENT_SOURCE_DIR}/caf_run_bench.cpp)
 target_link_libraries(caf_run_bench ${LIBCAF_LIBRARIES} ${LD_FLAGS})
 add_dependencies(all_benchmarks caf_run_bench)

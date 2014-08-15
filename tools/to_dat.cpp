@@ -32,23 +32,44 @@ struct statistics  {
     double conf_interval_95;
 
     statistics(const vector<double>& data) {
+        if (data.empty()) {
+            return;
+        }
+        if (data.size() == 1) {
+            mean = data.front();
+            variance = 0;
+            std_dev = 0;
+            conf_interval_95 = 0;
+            return;
+        }
         using namespace boost::math;
-        mean = accumulate(data.begin(), data.end(), 0.0, plus<double>{}) / data.size();
-        variance = accumulate(data.begin(), data.end(), 0.0, variance_plus{mean}) / data.size();
+        mean = accumulate(data.begin(), data.end(), 0., plus<double>{})
+               / data.size();
+        variance = accumulate(data.begin(), data.end(), 0., variance_plus{mean})
+                   / data.size();
         std_dev = sqrt(variance);
         // calculate confidence interval
         students_t dist{static_cast<double>(data.size() - 1)};
         // t-statistic for 95% confidence interval
         double tstat = quantile(complement(dist, 0.025 / 2));
         // width of confidence interval
-        conf_interval_95 = tstat * std_dev / sqrt(static_cast<double>(data.size()));
+        conf_interval_95 = tstat * std_dev
+                           / sqrt(static_cast<double>(data.size()));
     }
 
 };
 
 int main(int argc, char** argv) {
+    map<string, string> nice_names {
+        {"caf", "CAF"},
+        {"scala", "Scala"},
+        {"theron", "Theron"},
+        {"go", "GoLang"},
+        {"charm", "Charm"},
+        {"foundry", "ActorFoundry"}
+    };
     vector<string> files(argv + 1, argv + argc);
-    regex fname_regex("([0-9]+).*cores.*(cppa|scala|theron|erlang|go).*(actor_creation|mailbox_performance|mixed_case).txt");
+    regex fname_regex("([0-9]+).*cores.*(caf|scala|theron|erlang|go|foundry|charm).*(actor_creation|mailbox_performance|mixed_case).txt");
     smatch fname_match;
     // $benchmark => {$lang => {$num_cores => [$values]}}
     map<string, map<string, map<size_t, vector<double>>>> samples;
@@ -61,9 +82,10 @@ int main(int argc, char** argv) {
             auto bench = fname_match[3].str();
             vector<double>& values = samples[bench][lang][num_cores];
             ifstream f{fname};
-            while (f) {
-                double value;
-                f >> value;
+            double value;
+            while (f >> value) {
+                // convert ms to s
+                value /= 1000;
                 values.push_back(value);
             }
         }
@@ -82,11 +104,14 @@ int main(int argc, char** argv) {
         for (auto& kvp2 : kvp.second) {
             auto& lang = kvp2.first;
             file_header += " ";
-            file_header += lang;
+            file_header += nice_names[lang];
+            file_header += " ";
+            file_header += nice_names[lang] + "_yerr";
             for (auto& kvp3 : kvp2.second) {
                 auto num_cores = kvp3.first;
                 statistics stats{kvp3.second};
-                output_table[num_cores][lang] = make_pair(stats.mean, stats.conf_interval_95);
+                auto yerr = kvp3.second.size() < 9 ? 0. : stats.conf_interval_95;
+                output_table[num_cores][lang] = make_pair(stats.mean, yerr);
             }
         }
         ofstream oss{benchmark + ".dat"};
@@ -95,7 +120,7 @@ int main(int argc, char** argv) {
             oss << output_kvp.first; // number of cores
             for (auto& inner_kvp : output_kvp.second) {
                 oss << " " << inner_kvp.second.first   // mean
-                     << " " << inner_kvp.second.second; // 95% confidence interval
+                    << " " << inner_kvp.second.second; // 95% confidence interval
             }
             oss << endl;
         }
