@@ -3,3 +3,7 @@ build/*
 bin/*
 actor_foundry/lib_src/*
 actor_foundry/foundry-local-src-1.0.tar.gz
+charmrun
+*.o
+*.decl.h
+*.def.h
