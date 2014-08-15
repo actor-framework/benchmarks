@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 #include "charm++.h"
-#include "mailbox.decl.h"
+#include "charm_mailbox_performance.decl.h"
 
 struct main : public CBase_main {
   main(CkArgMsg* m) {
@@ -68,4 +68,4 @@ public:
   int m_value;
 };
 
-#include "mailbox.def.h"
+#include "charm_mailbox_performance.def.h"
