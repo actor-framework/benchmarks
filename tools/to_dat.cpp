@@ -66,6 +66,7 @@ int main(int argc, char** argv) {
         {"theron", "Theron"},
         {"go", "GoLang"},
         {"charm", "Charm"},
+        {"erlang", "Erlang"},
         {"foundry", "ActorFoundry"}
     };
     vector<string> files(argv + 1, argv + argc);
