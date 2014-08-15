@@ -1,0 +1,10 @@
+mainmodule charm_actor_creation {
+  mainchare main {
+    entry main(CkArgMsg*);
+  };
+  chare testee {
+    entry testee(bool is_root, CProxy_testee parent);
+    entry void spread(int num);
+    entry void result(int val);
+  };
+};

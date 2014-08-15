@@ -1,0 +1,25 @@
+mainmodule charm_mixed_case {
+  mainchare main {
+    entry main(CkArgMsg*);
+  };
+  chare supervisor {
+    entry supervisor(int num_msgs);
+    entry void result(const std::vector<uint64_t>& vec);
+    entry void masterdone();
+  };
+  chare chain_master {
+    entry chain_master(CProxy_supervisor sv, int rs, int itv, int n);
+    entry void init();
+    entry void token(int value);
+  };
+  chare worker {
+    entry worker(CProxy_supervisor sv);
+    entry void calc(uint64_t what);
+    entry void done();
+  };
+  chare chain_link {
+    entry chain_link(CProxy_chain_link next);
+    entry chain_link(CProxy_chain_master next, int dummy);
+    entry void token(int value);
+  };
+};

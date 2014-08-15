@@ -6,13 +6,13 @@ import osl.manager.annotations.message;
 
 public class receiver extends Actor {
   private static final long serialVersionUID = 4578965423751326142L;
-  public  static final String _CLASS =
-                       "osl.examples.caf_benches.receiver";
+//  public  static final String _CLASS =
+//                       "osl.examples.caf_benches.receiver";
   private              long   m_max;
   private              long   m_value;
 
-  @message
-  public void init(Long max) {
+  public receiver(Long max) {
+    super();
     m_max   = max.intValue();
     m_value = 0;
   }

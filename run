@@ -10,10 +10,12 @@ mem_poll_interval_ms=50
 max_trials=3
 
 # configure this for your system
-scala_home=/opt/local/share/scala-2.10
+#scala_home=/opt/local/share/scala-2.10
+scala_home=/home/neverlord/mobi8/scala-2.10.3
 
 # classpath for ActorFoundry
-classpath_foundry="actor_foundry/lib_src/lib/foundry-1.0.jar:actor_foundry/lib_src/classes"
+foundry_home=/home/neverlord/actor-framework/benchmarks/actor_foundry
+classpath_foundry="$foundry_home/lib_src/lib/foundry-1.0.jar:$foundry_home/lib_src/classes"
 
 usage="\
 usage: $0 USERID BIN_PATH IMPL BENCH RUNTIME_FILE MEM_USAGE_FILE
@@ -27,7 +29,7 @@ usage: $0 USERID BIN_PATH IMPL BENCH RUNTIME_FILE MEM_USAGE_FILE
 
 "
 
-if [[ $# < 4 ]]; then
+if [[ $# -le 4 ]]; then
   echo "too few arguments"; echo; echo "$usage"
   exit
 fi
@@ -51,12 +53,16 @@ mem_usage_out_file="$1" ; shift
 impl="$1" ; shift
 bench="$1" ; shift
 
-java_cmd=$(which java)
+#java_cmd=$(which java)
+java_cmd=/usr/java/jdk1.8.0/bin/java
 erl_cmd=$(which erl)
 
 case "$impl" in
   caf)
     cmd="$binpath/$bench $@"
+    ;;
+  charm)
+    cmd="$binpath/charm_$bench +p $NumCores $@"
     ;;
   scala)
     scala_lib="$scala_home/lib"
@@ -68,7 +74,8 @@ case "$impl" in
     cmd="$erl_cmd -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
     ;;
   foundry)
-    modified_args=\"$(echo "_$@" | tr ' ' _)\"
+    modified_args=$(echo "_$@" | tr ' ' _)
+    echo "modified_args = $modified_args"
     cmd="$java_cmd -cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
     ;;
   *)

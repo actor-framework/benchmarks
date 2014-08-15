@@ -1,0 +1,13 @@
+mainmodule charm_mailbox_performance {
+  mainchare main {
+    entry main(CkArgMsg*);
+  };
+  chare receiver {
+    entry receiver(uint64_t max);
+    entry void msg(int dummy);
+  };
+  chare sender {
+    entry sender(CProxy_receiver receiver, int count);
+    entry void run();
+  };
+};

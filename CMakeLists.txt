@@ -100,6 +100,65 @@ endif()
 
 
 ################################################################################
+#                                    Charm++                                   #
+################################################################################
+
+if(NOT CAF_NO_CHARM_BENCHMARK)
+  if(NOT CAF_CHARM_COMPILER)
+    set(CAF_CHARM_COMPILER "charmc")
+  endif()
+  execute_process(COMMAND "${CAF_CHARM_COMPILER}" -v
+                  RESULT_VARIABLE CharmResult
+                  ERROR_VARIABLE CharmVersionStr)
+  if(NOT CharmResult EQUAL 0)
+      message(STATUS "Disable Charm++ benchmarks: could not find a running compiler")
+    set(CAF_NO_CHARM_BENCHMARK yes)
+  endif()
+endif()
+# add target for Charm++ benchmarks
+if(NOT CAF_NO_ERLANG_BENCHMARKS)
+  message(STATUS "Add Charm++ benchmarks to build")
+  set(CAF_CHARM_PATH "${CMAKE_CURRENT_SOURCE_DIR}/charm")
+  macro(add_charm_benchmark name)
+    set(longname charm_${name})
+    set(longpath ${CAF_CHARM_PATH}/${longname})
+    set(CAF_CHARM_SRC_FILES ${longpath}.ci ${longpath}.cpp ${CAF_CHARM_SRC_FILES})
+    add_custom_command(OUTPUT ${longpath}.def.h
+                       COMMAND ${CAF_CHARM_COMPILER} ${longpath}.ci
+                       DEPENDS ${longpath}.ci
+                       WORKING_DIRECTORY ${CAF_CHARM_PATH}
+                       VERBATIM)
+    add_custom_command(OUTPUT ${longpath}.o
+                       COMMAND ${CAF_CHARM_COMPILER} -c ${longpath}.cpp
+                       DEPENDS ${longpath}.cpp ${longpath}.def.h
+                       WORKING_DIRECTORY ${CAF_CHARM_PATH}
+                       VERBATIM)
+    set(exe_file ${EXECUTABLE_OUTPUT_PATH}/${longname})
+    set(CAF_CHARM_OUT_FILES ${exe_file} ${CAF_CHARM_OUT_FILES})
+    add_custom_command(OUTPUT ${exe_file}
+                       COMMAND ${CAF_CHARM_COMPILER} ${longpath}.o -o ${exe_file} -language charm++
+                       DEPENDS ${longpath}.o
+                       WORKING_DIRECTORY ${CAF_CHARM_PATH}
+                       VERBATIM)
+  endmacro()
+  add_charm_benchmark(actor_creation)
+  add_charm_benchmark(mailbox_performance)
+  add_charm_benchmark(mixed_case)
+  add_custom_target(charm_benchmarks
+                    SOURCES ${CAF_CHARM_SRC_FILES}
+                    DEPENDS ${CAF_CHARM_OUT_FILES})
+  add_dependencies(all_benchmarks charm_benchmarks)
+else()
+  # make files show up in GUI even if not building Charm++
+  file(GLOB_RECURSE CHARM_SOURCES
+       "${CMAKE_CURRENT_SOURCE_DIR}/charm++/*.cpp"
+       "${CMAKE_CURRENT_SOURCE_DIR}/charm++/*.ci")
+  add_custom_target(caf_charm_bench_dummy SOURCES ${MISC_FILES})
+endif()
+
+
+
+################################################################################
 #                                     CAF                                      #
 ################################################################################
 

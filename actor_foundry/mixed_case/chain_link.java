@@ -6,13 +6,13 @@ import osl.manager.annotations.message;
 
 public class chain_link extends Actor {
   private static final long serialVersionUID = 4578547894020479372L;
-  public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.chain_link";
+//  public  static final      String _CLASS    =
+//                              "osl.examples.caf_benches.chain_link";
 
   private ActorName m_next;
-  
-  @message
-  public void init(ActorName next) {
+
+  public chain_link(ActorName next) {
+    super();
     m_next = next;
   }
 

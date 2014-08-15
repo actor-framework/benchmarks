@@ -4,12 +4,13 @@ import osl.manager.*;
 import osl.util.*;
 import osl.manager.annotations.message;
 
-import java.util.Vector;
+import java.util.List;
+import java.util.ArrayList;
 
 public class mixed_case extends Actor {
   private static final long serialVersionUID = 4277890623751326142L;
-  public  static final      String _CLASS    =
-                              "osl.examples.caf_benches.mixed_case";
+//  public  static final      String class    =
+//                              "osl.examples.caf_benches.mixed_case";
   public  static final long s_factor1        = 86028157;
   public  static final long s_factor2        = 329545133;
   public  static final long s_task_n         = s_factor1 * s_factor2;
@@ -34,11 +35,10 @@ public class mixed_case extends Actor {
     m_initial_token_value = Integer.parseInt(args[3]);
     m_repetitions         = Integer.parseInt(args[4]);
     int num_msgs = m_num_rings + (m_num_rings * m_repetitions);
-    ActorName sv = create(supervisor._CLASS);
-    send(sv, "init", num_msgs);
-    Vector<ActorName> masters = new Vector<ActorName>();
+    ActorName sv = create(supervisor.class, num_msgs);
+    List<ActorName> masters = new ArrayList<ActorName>();
     for (int i = 0; i < m_num_rings; ++i) {
-      masters.add(create(chain_master._CLASS));
+      masters.add(create(chain_master.class));
       send(masters.lastElement(), "init", sv, m_ring_size,
            m_initial_token_value, m_repetitions);
     }
