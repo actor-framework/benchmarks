@@ -66,7 +66,8 @@ int main(int argc, char** argv) {
         {"theron", "Theron"},
         {"go", "GoLang"},
         {"charm", "Charm"},
-        {"foundry", "ActorFoundry"}
+        {"foundry", "ActorFoundry"},
+        {"erlang", "Erlang"}
     };
     vector<string> files(argv + 1, argv + argc);
     regex fname_regex("([0-9]+).*cores.*(caf|scala|theron|erlang|go|foundry|charm).*(actor_creation|mailbox_performance|mixed_case).txt");
