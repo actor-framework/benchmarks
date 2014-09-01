@@ -4,7 +4,10 @@ import osl.manager.*;
 import osl.util.*;
 import osl.manager.annotations.message;
 
-import java.util.Vector;
+import java.io.Serializable;
+
+import java.util.List;
+import java.util.ArrayList;
 
 public class worker extends Actor {
   private static final long serialVersionUID = 4578547896541465872L;
@@ -20,7 +23,9 @@ public class worker extends Actor {
 
   @message
   public void calc(Long what) {
-    send(m_mc, "result", factorize(what));
+    // all major implementations of list implement Serilizable
+    // (as does the ArrayList we use)
+    send(m_mc, "result", (Serializable)factorize(what));
   }
 
   @message

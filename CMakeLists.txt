@@ -123,20 +123,20 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
     set(longname charm_${name})
     set(longpath ${CAF_CHARM_PATH}/${longname})
     set(CAF_CHARM_SRC_FILES ${longpath}.ci ${longpath}.cpp ${CAF_CHARM_SRC_FILES})
-    add_custom_command(OUTPUT ${longpath}.def.h
+    add_custom_command(OUTPUT ${longpath}.def.h ${longpath}.decl.h
                        COMMAND ${CAF_CHARM_COMPILER} ${longpath}.ci
                        DEPENDS ${longpath}.ci
                        WORKING_DIRECTORY ${CAF_CHARM_PATH}
                        VERBATIM)
     add_custom_command(OUTPUT ${longpath}.o
                        COMMAND ${CAF_CHARM_COMPILER} -c ${longpath}.cpp
-                       DEPENDS ${longpath}.cpp ${longpath}.def.h
+                       DEPENDS ${longpath}.cpp ${longpath}.def.h ${longpath}.decl.h
                        WORKING_DIRECTORY ${CAF_CHARM_PATH}
                        VERBATIM)
     set(exe_file ${EXECUTABLE_OUTPUT_PATH}/${longname})
     set(CAF_CHARM_OUT_FILES ${exe_file} ${CAF_CHARM_OUT_FILES})
     add_custom_command(OUTPUT ${exe_file}
-                       COMMAND ${CAF_CHARM_COMPILER} ${longpath}.o -o ${exe_file} -language charm++
+                       COMMAND ${CAF_CHARM_COMPILER} ${longpath}.o -o ${exe_file} -O3 -language charm++
                        DEPENDS ${longpath}.o
                        WORKING_DIRECTORY ${CAF_CHARM_PATH}
                        VERBATIM)

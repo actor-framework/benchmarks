@@ -39,7 +39,7 @@ public class mixed_case extends Actor {
     List<ActorName> masters = new ArrayList<ActorName>();
     for (int i = 0; i < m_num_rings; ++i) {
       masters.add(create(chain_master.class));
-      send(masters.lastElement(), "init", sv, m_ring_size,
+      send(masters.get(masters.size()-1), "init", sv, m_ring_size,
            m_initial_token_value, m_repetitions);
     }
   }
