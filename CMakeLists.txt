@@ -116,7 +116,7 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
   endif()
 endif()
 # add target for Charm++ benchmarks
-if(NOT CAF_NO_ERLANG_BENCHMARKS)
+if(NOT CAF_NO_CHARM_BENCHMARK)
   message(STATUS "Add Charm++ benchmarks to build")
   set(CAF_CHARM_PATH "${CMAKE_CURRENT_SOURCE_DIR}/charm")
   macro(add_charm_benchmark name)
