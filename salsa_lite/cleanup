@@ -1,0 +1,13 @@
+#!/bin/env bash
+# hello world
+rm -f demo/*.class
+rm -f demo/*.java
+# actor creation
+rm -f actor_creation/*.class
+rm -f actor_creation/*.java
+# mailbox
+rm -f mailbox/*.class
+rm -f mailbox/*.java
+# mixed case
+rm -f mixed_case/*.class
+rm -f mixed_case/*.java

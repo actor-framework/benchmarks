@@ -1,0 +1,19 @@
+#!/bin/env bash
+
+# actor creation
+#src_path=actor_creation
+#prog=actor_creation.actor_creation
+
+# mailbox
+src_path=mailbox_performance
+prog=mailbox_performance.mailbox_performance;
+
+salsapath=/opt/salsa/salsa_lite2.0.3.jar
+salsacompiler=salsa_lite.core.compiler.SalsaCompiler
+
+# invoke salsa compiler
+java -cp $salsapath:. $salsacompiler $src_path/*.salsa
+# invoke java compiler
+javac -classpath $salsapath:. $src_path/*.java
+# run program
+java -cp $salsapath:. -Dnstages=16 $prog
