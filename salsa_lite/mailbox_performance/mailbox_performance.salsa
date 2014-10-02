@@ -1,0 +1,15 @@
+module mailbox_performance;
+
+behavior mailbox_performance {
+
+  void act(String[] args) {
+    // todo arg parser...
+    int  num_sender = 1;
+    long num_msgs   = 1000000;
+    long max_msg    = num_sender * num_msgs;
+    receiver testee = new receiver(max_msg);
+    for (int i = 0; i < num_sender; ++i) {
+      new sender() <- kickoff(testee, num_msgs);
+    }
+  }
+}

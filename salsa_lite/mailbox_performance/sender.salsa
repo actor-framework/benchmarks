@@ -1,0 +1,9 @@
+module mailbox_performance;
+
+behavior sender {
+  public void kickoff(ActorReference whom, long count) {
+    for (long i = 0; i < count; ++i) {
+      whom <- msg();
+    }
+  }
+}
