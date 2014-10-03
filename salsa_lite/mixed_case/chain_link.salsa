@@ -1,0 +1,16 @@
+module mixed_case;
+
+behavior chain_link {
+  private ActorReference m_next;
+
+  public chain_link(ActorReference next) {
+    m_next = next;
+  }
+
+  public void _token(int v) {
+    m_next <- _token(v);
+    if (v == 0) {
+      destroy();
+    }
+  }
+}

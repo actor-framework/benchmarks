@@ -1,0 +1,43 @@
+module mixed_case;
+
+behavior chain_master {
+  private int            m_iteration;
+  private ActorReference m_mc;
+  private ActorReference m_next;
+  private ActorReference m_factorizer;
+  private int            m_ring_size;
+  private int            m_initial_token;
+  private int            m_repetitions;
+
+  public chain_master(ActorReference msgcollector, int ring_size,
+                      int initial_token, int repetitions) {
+    m_iteration   = 0;
+    m_mc          = msgcollector;
+    m_factorizer  = new worker(m_mc);
+    m_ring_size   = ring_size;
+    m_repetitions = repetitions;
+    new_ring(ring_size, initial_token);
+  }
+
+  void _token(int y) {
+    if (y == 0) {
+      if (++m_iteration < m_repetitions) {
+        new_ring(m_ring_size, m_initial_token);
+      } else {
+        m_factorizer <- done();
+        m_mc <- masterdone();
+      }
+    } else {
+      m_next <- _token(y - 1);
+    }
+  }
+
+  private void new_ring(int ring_size, int initial_token_value) {
+    m_factorizer <- calc(mixed_caseState.s_task_n);
+    m_next = self;
+    for (int i = 1; i < ring_size; ++i) {
+      m_next = new chain_link(m_next);
+    }
+    m_next <- _token(initial_token_value);
+  }
+}

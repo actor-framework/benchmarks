@@ -1,0 +1,38 @@
+module mixed_case;
+
+behavior worker {
+  private ActorReference m_mc = null;
+
+  public worker(ActorReference msgcollector) {
+    m_mc = msgcollector;
+  }
+
+  public void calc(long what) {
+    m_mc <- result(factorize(what));
+  }
+
+  public void done() {
+    destroy();
+  }
+
+  private long[] factorize(long n) {
+    long[] result = new long[2];
+    int idx = 0;
+    if (n <= 3) {
+      result[idx++] = n;
+      result[idx++] = n;
+      return result;
+    }
+    long d = 2;
+    while (d < n) {
+      if ((n % d) == 0) {
+        result[idx++] = d;
+        n /= d;
+      } else {
+        d = (d == 2) ? 3 : (d + 2);
+      }
+    }
+    result[idx++] = d;
+    return result;
+  }
+}
