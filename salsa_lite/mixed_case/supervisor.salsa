@@ -15,7 +15,7 @@ behavior supervisor {
   }
 
   public void result(long[] vec) {
-    //check_factors(vec);
+    check_factors(vec);
     if (--m_left == 0) {
       //self <- destroy();
       System.exit(0);

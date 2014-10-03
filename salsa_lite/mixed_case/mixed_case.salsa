@@ -19,9 +19,10 @@ behavior mixed_case {
   void act(String[] args) {
     // todo add arg parser...
     s_mainactor           = self;
-    m_num_rings           = 10;
-    m_ring_size           = 10;
-    m_initial_token_value = 10;
+    m_num_rings           = 20;
+    m_ring_size           = 50;
+    m_initial_token_value = 10000;
+    m_repetitions         = 5;
     int num_msgs = m_num_rings + (m_num_rings * m_repetitions);
     supervisor sv = new supervisor(num_msgs);
     //List<ActorReference> masters = new ArrayList<ActorReference>();

@@ -4,9 +4,13 @@
 #src_path=actor_creation
 #prog=actor_creation.actor_creation
 
-# mailbox
-src_path=mailbox_performance
-prog=mailbox_performance.mailbox_performance;
+# mailbox_performance
+#src_path=mailbox_performance
+#prog=mailbox_performance.mailbox_performance;
+
+# mixed case
+src_path=mixed_case
+prog=mixed_case.mixed_case
 
 salsapath=/opt/salsa/salsa_lite2.0.3.jar
 salsacompiler=salsa_lite.core.compiler.SalsaCompiler
