@@ -9,7 +9,12 @@ behavior actor_creation {
   private        int            m_r2     = 0;
 
   void act(String[] argv) {
-    s_num = 20; // todo add argument parser
+    if (argv.length != 1) {
+      standardOutput <- println("usage: actor_creation POW" +
+                                "       creates 2^POW actors");
+      System.exit(0);
+    }
+    s_num = Integer.parseInt(argv[0]);
     s_master = self;
     s_master <- spread(s_master, s_num);
   }

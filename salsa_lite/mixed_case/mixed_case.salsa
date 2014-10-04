@@ -17,19 +17,20 @@ behavior mixed_case {
   }
 
   void act(String[] args) {
-    // todo add arg parser...
+    if (args.length != 4) {
+      standardOutput <- println("usage: mixed_case NUM_RINGS " +
+                                "RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS");
+      System.exit(0);
+    }
     s_mainactor           = self;
-    m_num_rings           = 20;
-    m_ring_size           = 50;
-    m_initial_token_value = 10000;
-    m_repetitions         = 5;
-    int num_msgs = m_num_rings + (m_num_rings * m_repetitions);
+    m_num_rings           = Integer.parseInt(args[0]);
+    m_ring_size           = Integer.parseInt(args[1]);
+    m_initial_token_value = Integer.parseInt(args[2]);
+    m_repetitions         = Integer.parseInt(args[3]);
+    int num_msgs  = m_num_rings + (m_num_rings * m_repetitions);
     supervisor sv = new supervisor(num_msgs);
-    //List<ActorReference> masters = new ArrayList<ActorReference>();
     ActorReference[] masters = new ActorReference[m_num_rings];
     for (int i = 0; i < m_num_rings; ++i) {
-      //masters.add(new chain_master(sv, m_ring_size, m_initial_token_value,
-      //                             m_repetitions);
       masters[i] = new chain_master(sv, m_ring_size, m_initial_token_value,
                                     m_repetitions);
     }
