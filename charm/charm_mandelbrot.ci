@@ -1,0 +1,14 @@
+mainmodule charm_mandelbrot {
+  mainchare main {
+    entry main(CkArgMsg*);
+  };
+  chare counter {
+    entry counter(uint64_t, const std::vector<unsigned char>&);
+    entry void msg();
+  };
+  chare worker {
+    entry worker(CProxy_counter, int, int, int, double, 
+                std::vector<unsigned char>&, std::vector<double>&);
+    entry void calc(int);
+  };
+};

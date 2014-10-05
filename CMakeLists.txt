@@ -146,6 +146,7 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
   add_charm_benchmark(actor_creation)
   add_charm_benchmark(mailbox_performance)
   add_charm_benchmark(mixed_case)
+  add_charm_benchmark(mandelbrot)
   add_custom_target(charm_benchmarks
                     SOURCES ${CAF_CHARM_SRC_FILES}
                     DEPENDS ${CAF_CHARM_OUT_FILES})
