@@ -18,14 +18,14 @@ foundry_home=/home/neverlord/actor-framework/benchmarks/actor_foundry
 classpath_foundry="$foundry_home/lib_src/lib/foundry-1.0.jar:$foundry_home/lib_src/classes"
 
 usage="\
-usage: $0 USERID BIN_PATH IMPL BENCH RUNTIME_FILE MEM_USAGE_FILE
+usage: $0 USERID BIN_PATH RUNTIME_FILE MEM_USAGE_FILE IMPL BENCH BENCH_ARGS
 
   USERID:         ID of the user this benchmark should run as
   BIN_PATH:       path to CAF binaries
   RUNTIME_FILE:   output file for runtime
   MEM_USAGE_FILE: output file for memory consumption
-  IMPL:           (caf|scala|erlang|foundry)
-  BENCH:          (mixed_case|actor_creation|mailbox_performance)
+  IMPL:           (caf|scala|erlang|foundry|charm)
+  BENCH:          (mixed_case|actor_creation|mailbox_performance|mandelbrot)
 
 "
 
