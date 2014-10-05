@@ -59,6 +59,7 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
   add_scala_benchmark(actor_creation ${CAF_SCALA_utility_OUT})
   add_scala_benchmark(mailbox_performance ${CAF_SCALA_utility_OUT})
   add_scala_benchmark(mixed_case ${CAF_SCALA_utility_OUT})
+  add_scala_benchmark(mandelbrot ${CAF_SCALA_utility_OUT})
   add_custom_target(scala_benchmarks
                     SOURCES ${CAF_SCALA_SRC_FILES}
                     DEPENDS ${CAF_SCALA_OUT_FILES})
@@ -92,6 +93,7 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
   add_erlang_benchmark(actor_creation)
   add_erlang_benchmark(mailbox_performance)
   add_erlang_benchmark(mixed_case)
+  add_erlang_benchmark(mandelbrot)
   add_custom_target(erlang_benchmarks
                     SOURCES ${CAF_ERLANG_SRC_FILES}
                     DEPENDS ${CAF_ERLANG_OUT_FILES})
@@ -172,6 +174,7 @@ endmacro()
 add_caf_benchmark(actor_creation)
 add_caf_benchmark(mailbox_performance)
 add_caf_benchmark(mixed_case)
+add_caf_benchmark(mandelbrot)
 
 
 ################################################################################
