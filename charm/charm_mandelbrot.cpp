@@ -36,11 +36,13 @@ class main : public CBase_main {
         m_cr0[xk] = (2.0 * xk) / N - 1.5;
       }
     }
+    int num = CkNumPes();
+    int pe = 0;
     for (int y = 0; y < N; ++y) {
-      //CkPrintf("%s%i%s", "Creating worker ", y, ".\n");
-      CProxy_worker w = CProxy_worker::ckNew(N, max_x, max_iterations, limit_sq);
+      CProxy_worker w = CProxy_worker::ckNew(N, max_x, max_iterations, limit_sq, ++pe % num);
       w.calc(y);
     }
+    CkPrintf("%s", "main done\n");
   }
 };
 
@@ -61,6 +63,12 @@ class worker : public CBase_worker {
   }
 
   void calc(int row) {
+    /*
+    if (row < m_dim) {
+      CProxy_worker w = CProxy_worker::ckNew(m_dim, m_max_x, m_max_iters, m_limit_sq);
+      w.calc(row + 1);
+    }
+    */
     byte* line = &m_buffer[row * m_max_x];
     const double ci0 = 2.0 * row / m_dim - 1.0;
     for (int x = 0; x < m_max_x; ++x) {
