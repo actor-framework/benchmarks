@@ -182,8 +182,9 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
   add_salsa_benchmark("${MAILBOX_PERFORMANCE_SALSA_FILES}"
                       "${MAILBOX_PERFORMANCE_JAVA_FILES}"
                       "${MAILBOX_PERFORMANCE_CLASS_FILES}")
+  file(GLOB_RECURSE SALSA_SOURCES "${SRC_DIR}/*.salsa")
   add_custom_target(salsa_benchmarks
-                    SOURCES ${SRC_DIR}/actor_creation.salsa
+                    SOURCES ${SALSA_SOURCES}
                     DEPENDS ${ACTOR_CREATION_CLASS_FILES}
                             ${MIXED_CASE_CLASS_FILES}
                             ${MAILBOX_PERFORMANCE_CLASS_FILES})
