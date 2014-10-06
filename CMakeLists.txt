@@ -52,6 +52,7 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
   message(STATUS "Add Scala benchmarks to build (found version \"${ScalacVersion}\")")
   set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf/scala)
   macro(add_scala_benchmark name)
+    set(SCALA_${name}_COMPILER_OPTS -optimize)
     add_xxx_benchmark(SCALA scala ${name} scala class ${CLASS_PATH} ${ARGN})
   endmacro()
   add_scala_benchmark(utility)
@@ -248,6 +249,7 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
     set(longname charm_${name})
     set(longpath ${CAF_CHARM_PATH}/${longname})
     set(CAF_CHARM_SRC_FILES ${longpath}.ci ${longpath}.cpp ${CAF_CHARM_SRC_FILES})
+    set(CAF_${benchname}_COMPILER_OPTS -optimize)
     add_custom_command(OUTPUT ${longpath}.def.h ${longpath}.decl.h
                        COMMAND ${CAF_CHARM_COMPILER} ${longpath}.ci
                        DEPENDS ${longpath}.ci
