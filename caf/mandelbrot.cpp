@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
   const int    width          = N;
   const int    height         = N;
   const int    max_x          = (width + 7) / 8;
-  const int    max_iterations = 500;
+  const int    max_iterations = 250;
   const double limit          = 2.0;
   const double limit_sq       = limit * limit;
 

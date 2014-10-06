@@ -24,7 +24,7 @@ class main : public CBase_main {
     int N = atoi(m->argv[1]);
     delete m;
     int max_x = (N + 7) / 8;
-    int max_iterations = 500;
+    int max_iterations = 250;
     double limit = 2.0;
     double limit_sq = limit * limit;
     m_buffer.resize(N * max_x);

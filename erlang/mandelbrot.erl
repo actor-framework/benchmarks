@@ -1,7 +1,7 @@
 -module(mandelbrot).
 -export([start/1]).
 -define(LIM_SQR, 4.0).
--define(ITER, 500).
+-define(ITER, 250).
 -define(SR, -1.5).
 -define(SI, -1).
 
