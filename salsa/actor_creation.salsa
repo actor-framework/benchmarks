@@ -1,4 +1,4 @@
-module actor_creation;
+module org.caf.salsa;
 
 behavior actor_creation {
   private static int            s_num    = 0;

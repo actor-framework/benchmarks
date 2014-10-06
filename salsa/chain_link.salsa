@@ -1,4 +1,4 @@
-module mixed_case;
+module org.caf.salsa;
 
 behavior chain_link {
   private ActorReference m_next;

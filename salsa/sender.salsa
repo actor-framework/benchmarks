@@ -1,4 +1,4 @@
-module mailbox_performance;
+module org.caf.salsa;
 
 behavior sender {
   public void kickoff(ActorReference whom, long count) {

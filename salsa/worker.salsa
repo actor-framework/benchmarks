@@ -1,4 +1,4 @@
-module mixed_case;
+module org.caf.salsa;
 
 behavior worker {
   private ActorReference m_mc = null;

@@ -1,6 +1,6 @@
-package org.caf
+package org.caf.scala
 
-import org.caf.utility._
+import org.caf.scala.utility._
 
 import akka.actor._
 

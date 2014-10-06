@@ -9,15 +9,14 @@ add_custom_target(all_benchmarks ALL)
 #                                   Utility                                    #
 ################################################################################
 
-macro(add_xxx_benchmark dir name src_ending bin_ending out_path)
-  string(TOUPPER "${dir}" benchname)
+macro(add_xxx_benchmark benchname dir name src_ending bin_ending out_path)
   set(OUT_FILE ${out_path}/${name}.${bin_ending})
   set(SRC_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/${name}.${src_ending})
   set(CAF_${benchname}_SRC_FILES ${SRC_FILE} ${CAF_${benchname}_SRC_FILES})
   set(CAF_${benchname}_${name}_OUT ${OUT_FILE})
   set(CAF_${benchname}_OUT_FILES ${OUT_FILE} ${CAF_${benchname}_OUT_FILES})
   add_custom_command(OUTPUT ${OUT_FILE}
-                     COMMAND ${CAF_${benchname}_COMPILER} ${SRC_FILE}
+                     COMMAND ${CAF_${benchname}_COMPILER} ${CAF_${benchname}_COMPILER_OPTS} ${SRC_FILE}
                      DEPENDS ${SRC_FILE} ${ARGN}
                      WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
                      VERBATIM)
@@ -44,16 +43,16 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
       set(CAF_NO_SCALA_BENCHMARKS yes)
     endif()
   else()
-      message(STATUS "Disable Scala benchmarks: could not find a running compiler")
+    message(STATUS "Disable Scala benchmarks: could not find a running compiler")
     set(CAF_NO_SCALA_BENCHMARKS yes)
   endif()
 endif()
 # add targets for Scala benchmarks
 if(NOT CAF_NO_SCALA_BENCHMARKS)
   message(STATUS "Add Scala benchmarks to build (found version \"${ScalacVersion}\")")
-  set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf)
+  set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf/scala)
   macro(add_scala_benchmark name)
-    add_xxx_benchmark(scala ${name} scala class ${CLASS_PATH} ${ARGN})
+    add_xxx_benchmark(SCALA scala ${name} scala class ${CLASS_PATH} ${ARGN})
   endmacro()
   add_scala_benchmark(utility)
   add_scala_benchmark(actor_creation ${CAF_SCALA_utility_OUT})
@@ -64,6 +63,130 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
                     SOURCES ${CAF_SCALA_SRC_FILES}
                     DEPENDS ${CAF_SCALA_OUT_FILES})
   add_dependencies(all_benchmarks scala_benchmarks)
+endif()
+
+
+################################################################################
+#                                    SALSA                                     #
+################################################################################
+
+if(NOT CAF_NO_SALSA_BENCHMARKS)
+  if(NOT CAF_SALSA_JAR)
+    # try find it in home directory
+    set(CAF_SALSA_JAR "$ENV{HOME}/salsa_lite2.0.3.jar")
+  endif()
+  if(NOT EXISTS "${CAF_SALSA_JAR}")
+    message(STATUS "Disable SALAS benchmarks: salsa JAR file not found")
+    set(CAF_NO_SALSA_BENCHMARKS yes)
+  else()
+    if(NOT CAF_JAVA_BIN)
+      set(CAF_JAVA_BIN "java")
+    endif()
+    execute_process(COMMAND "${CAF_JAVA_BIN}" "-version"
+                    RESULT_VARIABLE JavaResult
+                    ERROR_VARIABLE JavaVersionStr)
+    if(JavaResult EQUAL 0)
+      string(REGEX REPLACE ".*version \"([0-9]+\\.[0-9]+\\.[0-9_]+)\".*" "\\1"
+             JavaVersion "${JavaVersionStr}")
+    else()
+      message(STATUS "Disable SALSA benchmarks: unable to run java")
+      set(CAF_NO_SALSA_BENCHMARKS yes)
+    endif()
+    if(NOT CAF_JAVA_COMPILER)
+      set(CAF_JAVA_COMPILER "javac")
+    endif()
+    execute_process(COMMAND "${CAF_JAVA_COMPILER}" "-version"
+                    RESULT_VARIABLE JavacResult
+                    ERROR_VARIABLE JavacVersionStr)
+    if(JavacResult EQUAL 0)
+      string(REGEX REPLACE ".*version \"([0-9]+\\.[0-9]+\\.[0-9_]+)\".*" "\\1"
+             JavacVersion "${JavacVersionStr}")
+    else()
+      message(STATUS "Disable SALSA benchmarks: unable to run java")
+      set(CAF_NO_SALSA_BENCHMARKS yes)
+    endif()
+  endif()
+endif()
+# add targets for SALSA benchmarks
+if(NOT CAF_NO_SALSA_BENCHMARKS)
+  set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf/salsa)
+  set(JAVAC_OPTS -cp "${CAF_SALSA_JAR}:." -d ${EXECUTABLE_OUTPUT_PATH})
+  set(SALSA_OPTS -cp "${CAF_SALSA_JAR}:." salsa_lite.core.compiler.SalsaCompiler)
+  message(STATUS "Add SALSA benchmarks to build (found java \"${JavaVersion}\")")
+  set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/salsa)
+  macro(add_salsa_benchmark salsa_files java_files class_files)
+    add_custom_command(OUTPUT ${java_files}
+                       COMMAND ${CAF_JAVA_BIN} ${SALSA_OPTS} ${salsa_files}
+                       DEPENDS ${salsa_files}
+                       WORKING_DIRECTORY ${SRC_DIR}
+                       VERBATIM)
+    add_custom_command(OUTPUT ${class_files}
+                       COMMAND ${CAF_JAVA_COMPILER} ${JAVAC_OPTS} ${java_files}
+                       DEPENDS ${java_files}
+                       WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
+                       VERBATIM)
+  endmacro()
+  # actor creation
+  set(ACTOR_CREATION_SALSA_FILES ${SRC_DIR}/actor_creation.salsa)
+  set(ACTOR_CREATION_JAVA_FILES ${SRC_DIR}/actor_creation.java
+                                ${SRC_DIR}/actor_creationState.java)
+  set(ACTOR_CREATION_CLASS_FILES ${CLASS_PATH}/actor_creation.class
+                                 ${CLASS_PATH}/actor_creationState.class)
+  add_salsa_benchmark("${ACTOR_CREATION_SALSA_FILES}"
+                      "${ACTOR_CREATION_JAVA_FILES}"
+                      "${ACTOR_CREATION_CLASS_FILES}")
+  # mixed case
+  set(MIXED_CASE_SALSA_FILES ${SRC_DIR}/chain_link.salsa
+                             ${SRC_DIR}/chain_master.salsa
+                             ${SRC_DIR}/supervisor.salsa
+                             ${SRC_DIR}/worker.salsa
+                             ${SRC_DIR}/mixed_case.salsa)
+  set(MIXED_CASE_JAVA_FILES ${SRC_DIR}/chain_link.java
+                            ${SRC_DIR}/chain_linkState.java
+                            ${SRC_DIR}/chain_master.java
+                            ${SRC_DIR}/chain_masterState.java
+                            ${SRC_DIR}/supervisor.java
+                            ${SRC_DIR}/supervisorState.java
+                            ${SRC_DIR}/worker.java
+                            ${SRC_DIR}/workerState.java
+                            ${SRC_DIR}/mixed_case.java
+                            ${SRC_DIR}/mixed_caseState.java)
+  set(MIXED_CASE_CLASS_FILES ${CLASS_PATH}/chain_link.class
+                             ${CLASS_PATH}/chain_master.class
+                             ${CLASS_PATH}/supervisor.class
+                             ${CLASS_PATH}/worker.class
+                             ${CLASS_PATH}/mixed_case.class)
+  add_salsa_benchmark("${MIXED_CASE_SALSA_FILES}"
+                      "${MIXED_CASE_JAVA_FILES}"
+                      "${MIXED_CASE_CLASS_FILES}")
+  # mailbox performance
+  set(MAILBOX_PERFORMANCE_SALSA_FILES
+      ${SRC_DIR}/sender.salsa
+      ${SRC_DIR}/receiver.salsa
+      ${SRC_DIR}/mailbox_performance.salsa)
+  set(MAILBOX_PERFORMANCE_JAVA_FILES
+      ${SRC_DIR}/sender.java
+      ${SRC_DIR}/senderState.java
+      ${SRC_DIR}/receiver.java
+      ${SRC_DIR}/receiverState.java
+      ${SRC_DIR}/mailbox_performance.java
+      ${SRC_DIR}/mailbox_performanceState.java)
+  set(MAILBOX_PERFORMANCE_CLASS_FILES
+      ${CLASS_PATH}/sender.class
+      ${CLASS_PATH}/senderState.class
+      ${CLASS_PATH}/receiver.class
+      ${CLASS_PATH}/receiverState.class
+      ${CLASS_PATH}/mailbox_performance.class
+      ${CLASS_PATH}/mailbox_performanceState.class)
+  add_salsa_benchmark("${MAILBOX_PERFORMANCE_SALSA_FILES}"
+                      "${MAILBOX_PERFORMANCE_JAVA_FILES}"
+                      "${MAILBOX_PERFORMANCE_CLASS_FILES}")
+  add_custom_target(salsa_benchmarks
+                    SOURCES ${SRC_DIR}/actor_creation.salsa
+                    DEPENDS ${ACTOR_CREATION_CLASS_FILES}
+                            ${MIXED_CASE_CLASS_FILES}
+                            ${MAILBOX_PERFORMANCE_CLASS_FILES})
+  add_dependencies(all_benchmarks salsa_benchmarks)
 endif()
 
 
@@ -88,7 +211,7 @@ endif()
 if(NOT CAF_NO_ERLANG_BENCHMARKS)
   message(STATUS "Add Erlang benchmarks to build")
   macro(add_erlang_benchmark name)
-    add_xxx_benchmark(erlang ${name} erl beam ${EXECUTABLE_OUTPUT_PATH} ${ARGN})
+    add_xxx_benchmark(ERLANG erlang ${name} erl beam ${EXECUTABLE_OUTPUT_PATH} ${ARGN})
   endmacro()
   add_erlang_benchmark(actor_creation)
   add_erlang_benchmark(mailbox_performance)

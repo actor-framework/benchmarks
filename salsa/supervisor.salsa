@@ -1,8 +1,8 @@
-module mixed_case;
+module org.caf.salsa;
 
 behavior supervisor {
   private int m_left = 0;
-  
+
   public supervisor(int left) {
     m_left = left;
   }

@@ -1,4 +1,4 @@
-module mixed_case;
+module org.caf.salsa;
 
 behavior mixed_case {
   public static /* final */ long s_factor1 = 86028157;

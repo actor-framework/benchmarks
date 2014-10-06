@@ -1,4 +1,4 @@
-module mailbox_performance;
+module org.caf.salsa;
 
 behavior mailbox_performance {
 

@@ -54,8 +54,11 @@ impl="$1" ; shift
 bench="$1" ; shift
 
 #java_cmd=$(which java)
-java_cmd=/usr/java/jdk1.8.0/bin/java
+java_cmd=/usr/bin/java
+jvm_tuning="-Xmx10240M -Xms32M"
 erl_cmd=$(which erl)
+
+salsa_cp=/Users/neverlord/salsa_lite2.0.3.jar
 
 case "$impl" in
   caf)
@@ -66,9 +69,8 @@ case "$impl" in
     ;;
   scala)
     scala_lib="$scala_home/lib"
-    jvm_tuning="-Xmx10240M -Xms32M"
     scala_tuning="-Xbootclasspath/a:$scala_lib/akka-actors.jar:$scala_lib/jline.jar:$scala_lib/scala-actors-migration.jar:$scala_lib/scala-actors.jar:$scala_lib/scala-compiler.jar:$scala_lib/scala-library.jar:$scala_lib/scala-reflect.jar:$scala_lib/scala-swing.jar:$scala_lib/scalap.jar:$scala_lib/typesafe-config.jar -classpath "" -Dscala.home=$scala_home -Dscala.usejavacp=true scala.tools.nsc.MainGenericRunner"
-    cmd="$java_cmd $jvm_tuning $scala_tuning org.caf.$bench $@"
+    cmd="$java_cmd $jvm_tuning $scala_tuning org.caf.scala.$bench $@"
     ;;
   erlang)
     cmd="$erl_cmd -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
@@ -77,6 +79,10 @@ case "$impl" in
     modified_args=$(echo "_$@" | tr ' ' _)
     echo "modified_args = $modified_args"
     cmd="$java_cmd -cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
+    ;;
+  salsa)
+    cmd="$java_cmd $jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores org.caf.salsa.${bench} $@"
+    echo "cmd = $cmd"
     ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"

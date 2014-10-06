@@ -1,4 +1,4 @@
-module mailbox_performance;
+module org.caf.salsa;
 
 behavior receiver {
   private long m_max;

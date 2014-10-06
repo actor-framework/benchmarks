@@ -6,16 +6,16 @@
    added Akka
 */
 
-package org.caf
+package org.caf.scala
 
 import akka.actor._
-import org.caf.utility._
+import org.caf.scala.utility._
 
 import Array._
 import java.io.BufferedOutputStream
 
 object mandelbrot {
-  
+
   var global_latch: java.util.concurrent.CountDownLatch = null
 
   var size: Int = 0

@@ -7,3 +7,4 @@ charmrun
 *.o
 *.decl.h
 *.def.h
+salsa/*.java

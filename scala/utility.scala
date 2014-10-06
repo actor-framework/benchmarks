@@ -1,4 +1,4 @@
-package org.caf
+package org.caf.scala
 
 object utility {
 

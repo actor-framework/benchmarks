@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/bin/bash
 
 # actor creation
 src_path=actor_creation
@@ -19,12 +19,13 @@ argument2=50
 argument3=10000
 argument4=5
 
-salsapath=/opt/salsa/salsa_lite2.0.3.jar
+salsapath=$HOME/salsa_lite2.0.3.jar
 salsacompiler=salsa_lite.core.compiler.SalsaCompiler
 
 # invoke salsa compiler
-java -cp $salsapath:. $salsacompiler $src_path/*.salsa
+#java -cp $salsapath:. $salsacompiler $src_path/*.salsa
+echo "java -cp $salsapath:. $salsacompiler *.salsa"
+java -cp $salsapath:. $salsacompiler *.salsa
 # invoke java compiler
-javac -classpath $salsapath:. $src_path/*.java
-# run program
-java -cp $salsapath:. -Dnstages=16 $prog $argument1 $argument2 $argument3 $argument4
+#javac -classpath $salsapath:. $src_path/*.java
+javac -classpath $salsapath:. *.java
