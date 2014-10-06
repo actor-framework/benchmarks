@@ -82,7 +82,6 @@ case "$impl" in
     ;;
   salsa)
     cmd="$java_cmd $jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores org.caf.salsa.${bench} $@"
-    echo "cmd = $cmd"
     ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"
