@@ -24,7 +24,7 @@ object mandelbrot {
   var donerows: Array[Boolean] = _
   var nextRow = 0
   val limitSquared = 4.0
-  val max = 50
+  val max = 500
 
   case class Row(row: Int)
 
