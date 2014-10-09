@@ -3,7 +3,7 @@
 behavior chain_master {
   int            m_iteration;
   supervisor     m_mc;
-  chain_link      m_next;
+  chain_link     m_next;
   worker         m_factorizer;
   int            m_ring_size;
   int            m_initial_token;
@@ -19,7 +19,7 @@ behavior chain_master {
     m_initial_token = initial_token;
     m_factorizer <- calc();
     self <- build_ring() @
-    m_next <- _token(m_initial_token);
+    self <- _token(m_initial_token);
   }
 
   ack build_ring() {
