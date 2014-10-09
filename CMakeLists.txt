@@ -74,10 +74,10 @@ endif()
 if(NOT CAF_NO_SALSA_BENCHMARKS)
   if(NOT CAF_SALSA_JAR)
     # try find it in home directory
-    set(CAF_SALSA_JAR "$ENV{HOME}/salsa_lite2.0.3.jar")
+    set(CAF_SALSA_JAR "$ENV{HOME}/SalsaLite.jar")
   endif()
   if(NOT EXISTS "${CAF_SALSA_JAR}")
-    message(STATUS "Disable SALAS benchmarks: salsa JAR file not found")
+    message(STATUS "Disable SALSA benchmarks: salsa JAR file not found")
     set(CAF_NO_SALSA_BENCHMARKS yes)
   else()
     if(NOT CAF_JAVA_BIN)
@@ -112,7 +112,7 @@ endif()
 if(NOT CAF_NO_SALSA_BENCHMARKS)
   set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf/salsa)
   set(JAVAC_OPTS -cp "${CAF_SALSA_JAR}:." -d ${EXECUTABLE_OUTPUT_PATH})
-  set(SALSA_OPTS -cp "${CAF_SALSA_JAR}:." salsa_lite.core.compiler.SalsaCompiler)
+  set(SALSA_OPTS -cp "${CAF_SALSA_JAR}:." salsa_lite.compiler.SalsaCompiler)
   message(STATUS "Add SALSA benchmarks to build (found java \"${JavaVersion}\")")
   set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/salsa)
   macro(add_salsa_benchmark salsa_files java_files class_files)
@@ -129,10 +129,8 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
   endmacro()
   # actor creation
   set(ACTOR_CREATION_SALSA_FILES ${SRC_DIR}/actor_creation.salsa)
-  set(ACTOR_CREATION_JAVA_FILES ${SRC_DIR}/actor_creation.java
-                                ${SRC_DIR}/actor_creationState.java)
-  set(ACTOR_CREATION_CLASS_FILES ${CLASS_PATH}/actor_creation.class
-                                 ${CLASS_PATH}/actor_creationState.class)
+  set(ACTOR_CREATION_JAVA_FILES  ${SRC_DIR}/actor_creation.java)
+  set(ACTOR_CREATION_CLASS_FILES ${CLASS_PATH}/actor_creation.class)
   add_salsa_benchmark("${ACTOR_CREATION_SALSA_FILES}"
                       "${ACTOR_CREATION_JAVA_FILES}"
                       "${ACTOR_CREATION_CLASS_FILES}")
@@ -143,15 +141,10 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
                              ${SRC_DIR}/worker.salsa
                              ${SRC_DIR}/mixed_case.salsa)
   set(MIXED_CASE_JAVA_FILES ${SRC_DIR}/chain_link.java
-                            ${SRC_DIR}/chain_linkState.java
                             ${SRC_DIR}/chain_master.java
-                            ${SRC_DIR}/chain_masterState.java
                             ${SRC_DIR}/supervisor.java
-                            ${SRC_DIR}/supervisorState.java
                             ${SRC_DIR}/worker.java
-                            ${SRC_DIR}/workerState.java
-                            ${SRC_DIR}/mixed_case.java
-                            ${SRC_DIR}/mixed_caseState.java)
+                            ${SRC_DIR}/mixed_case.java)
   set(MIXED_CASE_CLASS_FILES ${CLASS_PATH}/chain_link.class
                              ${CLASS_PATH}/chain_master.class
                              ${CLASS_PATH}/supervisor.class
@@ -167,18 +160,12 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
       ${SRC_DIR}/mailbox_performance.salsa)
   set(MAILBOX_PERFORMANCE_JAVA_FILES
       ${SRC_DIR}/sender.java
-      ${SRC_DIR}/senderState.java
       ${SRC_DIR}/receiver.java
-      ${SRC_DIR}/receiverState.java
-      ${SRC_DIR}/mailbox_performance.java
-      ${SRC_DIR}/mailbox_performanceState.java)
+      ${SRC_DIR}/mailbox_performance.java)
   set(MAILBOX_PERFORMANCE_CLASS_FILES
       ${CLASS_PATH}/sender.class
-      ${CLASS_PATH}/senderState.class
       ${CLASS_PATH}/receiver.class
-      ${CLASS_PATH}/receiverState.class
-      ${CLASS_PATH}/mailbox_performance.class
-      ${CLASS_PATH}/mailbox_performanceState.class)
+      ${CLASS_PATH}/mailbox_performance.class)
   add_salsa_benchmark("${MAILBOX_PERFORMANCE_SALSA_FILES}"
                       "${MAILBOX_PERFORMANCE_JAVA_FILES}"
                       "${MAILBOX_PERFORMANCE_CLASS_FILES}")

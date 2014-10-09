@@ -1,35 +1,26 @@
-module org.caf.salsa;
+//module org.caf.salsa;
+
+//import salsa_lite.io.StandardOutput;
 
 behavior mixed_case {
-  public static /* final */ long s_factor1 = 86028157;
-  public static /* final */ long s_factor2 = 329545133;
-  public static /* final */ long s_task_n  = s_factor1 * s_factor2;
+  int            m_num_rings           = 0;
+  int            m_ring_size           = 0;
+  int            m_initial_token_value = 0;
+  int            m_repetitions         = 0;
 
-  private static ActorReference s_mainactor           = null;
-  private        int            m_num_rings           = 0;
-  private        int            m_ring_size           = 0;
-  private        int            m_initial_token_value = 0;
-  private        int            m_repetitions         = 0;
-
-  /* the main actor store */
-  public static ActorReference getMainActor() {
-    return s_mainactor;
-  }
-
-  void act(String[] args) {
+  ack act(String[] args) {
     if (args.length != 4) {
-      standardOutput <- println("usage: mixed_case NUM_RINGS " +
-                                "RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS");
+      //standardOutput <- println("usage: mixed_case NUM_RINGS " +
+      //                          "RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS");
       System.exit(0);
     }
-    s_mainactor           = self;
     m_num_rings           = Integer.parseInt(args[0]);
     m_ring_size           = Integer.parseInt(args[1]);
     m_initial_token_value = Integer.parseInt(args[2]);
     m_repetitions         = Integer.parseInt(args[3]);
     int num_msgs  = m_num_rings + (m_num_rings * m_repetitions);
     supervisor sv = new supervisor(num_msgs);
-    ActorReference[] masters = new ActorReference[m_num_rings];
+    chain_master[] masters = new chain_master[m_num_rings];
     for (int i = 0; i < m_num_rings; ++i) {
       masters[i] = new chain_master(sv, m_ring_size, m_initial_token_value,
                                     m_repetitions);

@@ -1,50 +1,57 @@
-module org.caf.salsa;
+//module org.caf.salsa;
+
+//import salsa_lite.io.StandardOutput; // not found...
 
 behavior actor_creation {
-  private static int            s_num    = 0;
-  private static ActorReference s_master = null; /* master actor */
-  private static int            m_reach  = 0;
-  private        ActorReference m_parent = null;
-  private        int            m_r1     = 0;
-  private        int            m_r2     = 0;
+  int            m_num    = 0;
+  actor_creation m_master = null; /* master actor */
+  int            m_reach  = 0;
+  actor_creation m_parent = null;
+  int            m_r1     = 0;
+  int            m_r2     = 0;
 
-  void act(String[] argv) {
+  ack act(String[] argv) {
     if (argv.length != 1) {
-      standardOutput <- println("usage: actor_creation POW" +
-                                "       creates 2^POW actors");
+      //standardOutput <- println("usage: actor_creation POW" +
+      //                          "       creates 2^POW actors");
       System.exit(0);
     }
-    s_num = Integer.parseInt(argv[0]);
-    s_master = self;
-    s_master <- spread(s_master, s_num);
+    m_num = Integer.parseInt(argv[0]);
+    m_master = self;
+    m_master <- spread(m_master, m_num);
   }
 
-  void spread(ActorReference parent, int x) {
-    m_parent = parent;
+  actor_creation(actor_creation master, int num) {
+    m_num    = num;
+    m_master = master;
+  }
+
+  ack spread(actor_creation _parent, int x) {
+    m_parent = _parent;
     if (x == 1) {
-      parent <- result(1);
+      _parent <- result(1);
     } else {
       int msg = x - 1;
-      new actor_creation() <- spread(self, msg);
-      new actor_creation() <- spread(self, msg);
+      new actor_creation(m_master, m_num) <- spread(self, msg);
+      new actor_creation(m_master, m_num) <- spread(self, msg);
     }
   }
 
-  void result(int r) {
+  ack result(int r) {
     if      (m_r1 == 0) m_r1 = r;
     else if (m_r2 == 0) m_r2 = r;
     if (m_r1 != 0 && m_r2 != 0) {
-      if (m_parent == s_master) {
+      if (m_parent == m_master) {
         if (m_reach++ <= 2) {
           /* 2 child actors refer to master actor, but we just wanna validate
              if we reached the master again
            */
           m_parent <- result(1 + m_r1 + m_r2);
-          destroy();
+          //self <- destroy();
           return;
         }
-        final int result   = 2 + m_r1 + m_r2;
-        final int expected = (1 << s_num);
+        int result   = 2 + m_r1 + m_r2;
+        int expected = (1 << m_num);
         if (result != expected) {
           String str = "expected: " + expected + " found: " + result;
           //standardOutput <− println(str); // why is this not working...?
@@ -56,7 +63,7 @@ behavior actor_creation {
       } else {
         m_parent <- result(1 + m_r1 + m_r2);
       }
-      destroy();
+      //self <- destroy();
     }
   }
 }

@@ -1,32 +1,32 @@
-module org.caf.salsa;
+//module org.caf.salsa;
 
 behavior supervisor {
-  private int m_left = 0;
+  int m_left = 0;
 
-  public supervisor(int left) {
+  supervisor(int left) {
     m_left = left;
   }
 
-  public void masterdone() {
+  ack masterdone() {
     if (--m_left == 0) {
       //destory();
       System.exit(0);
     }
   }
 
-  public void result(long[] vec) {
-    check_factors(vec);
+  ack result(long[] vec) {
+    //check_factors(vec);
     if (--m_left == 0) {
       //self <- destroy();
       System.exit(0);
     }
   }
 
-  private void check_factors(long[] vec) {
+  /*void check_factors(long[] vec) {
     if (vec.length != 2 || vec[0] != mixed_caseState.s_factor1 ||
         vec[1] != mixed_caseState.s_factor2) {
       // error...
       System.out.println("ERROR");
     }
-  }
+  }*/
 }

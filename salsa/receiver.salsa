@@ -1,15 +1,15 @@
-module org.caf.salsa;
+//module org.caf.salsa;
 
 behavior receiver {
-  private long m_max;
-  private long m_value;
+  long m_max;
+  long m_value;
 
-  public receiver(long max) {
+  receiver(long max) {
     m_max   = max;
     m_value = 0;
   }
 
-  public void msg() {
+  ack msg() {
     if (++m_value == m_max) {
       // I don't know a better way. We don't want to keep
       // the WWCReceptionService running.

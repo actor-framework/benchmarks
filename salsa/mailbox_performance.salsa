@@ -1,11 +1,13 @@
-module org.caf.salsa;
+//module org.caf.salsa;
+
+//import salsa_lite.io.StandardOutput;
 
 behavior mailbox_performance {
 
-  void act(String[] args) {
+  ack act(String[] args) {
     if (args.length != 2) {
-      standardOutput <- println("usage: mailbox_performance " +
-                                "NUM_THREADS MSGS_PER_THREAD");
+      //standardOutput <- println("usage: mailbox_performance " +
+      //                          "NUM_THREADS MSGS_PER_THREAD");
       System.exit(0);
     }
     int  num_sender = Integer.parseInt(args[0]);
