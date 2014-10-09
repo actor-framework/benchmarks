@@ -3,7 +3,7 @@
 behavior chain_master {
   int            m_iteration;
   supervisor     m_mc;
-  ActorReference m_next;
+  chain_link      m_next;
   worker         m_factorizer;
   int            m_ring_size;
   int            m_initial_token;
@@ -23,9 +23,9 @@ behavior chain_master {
   }
 
   ack build_ring() {
-    m_next = self;
+    m_next = null;
     for (int i = 1; i < m_ring_size; ++i) {
-      m_next = new chain_link(m_next);
+      m_next = new chain_link(m_next, self);
     }
   }
 

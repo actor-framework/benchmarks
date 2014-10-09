@@ -1,14 +1,20 @@
 //module org.caf.salsa;
 
 behavior chain_link {
-  ActorReference m_next;
+  chain_link m_next;
+  chain_master m_master;
 
-  chain_link(ActorReference next) {
+  chain_link(chain_link next, chain_master master) {
     m_next = next;
+    m_master = master;
   }
 
   ack _token(int v) {
-    m_next <- _token(v);
+    if (m_next == null) {
+      m_master <- _token(v);
+    } else {
+      m_next <- _token(v);
+    }
     if (v == 0) {
       //self <- destroy(); // COMPILER ERROR: Could not find matching message, message name: 'destroy'
     }
