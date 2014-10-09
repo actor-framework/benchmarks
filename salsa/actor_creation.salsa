@@ -10,7 +10,7 @@ behavior actor_creation {
   int            m_r1     = 0;
   int            m_r2     = 0;
 
-  ack act(String[] argv) {
+  actor_creation(String[] argv) {
     if (argv.length != 1) {
       //standardOutput <- println("usage: actor_creation POW" +
       //                          "       creates 2^POW actors");

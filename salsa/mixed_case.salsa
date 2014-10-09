@@ -8,7 +8,7 @@ behavior mixed_case {
   int            m_initial_token_value = 0;
   int            m_repetitions         = 0;
 
-  ack act(String[] args) {
+  mixed_case(String[] args) {
     if (args.length != 4) {
       //standardOutput <- println("usage: mixed_case NUM_RINGS " +
       //                          "RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS");

@@ -4,7 +4,7 @@
 
 behavior mailbox_performance {
 
-  ack act(String[] args) {
+  mailbox_performance(String[] args) {
     if (args.length != 2) {
       //standardOutput <- println("usage: mailbox_performance " +
       //                          "NUM_THREADS MSGS_PER_THREAD");
