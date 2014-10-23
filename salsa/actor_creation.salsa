@@ -47,23 +47,21 @@ behavior actor_creation {
              if we reached the master again
            */
           m_parent <- result(1 + m_r1 + m_r2);
-          //self <- destroy();
-          return;
+        } else {
+          int result   = 2 + m_r1 + m_r2;
+          int expected = (1 << m_num);
+          if (result != expected) {
+            String str = "expected: " + expected + " found: " + result;
+            //standardOutput <− println(str); // why is this not working...?
+            System.out.println(str);
+          }
+          // I don't know a better way. We don't want to keep
+          // the WWCReceptionService running.
+          System.exit(0);
         }
-        int result   = 2 + m_r1 + m_r2;
-        int expected = (1 << m_num);
-        if (result != expected) {
-          String str = "expected: " + expected + " found: " + result;
-          //standardOutput <− println(str); // why is this not working...?
-          System.out.println(str);
-        }
-        // I don't know a better way. We don't want to keep
-        // the WWCReceptionService running.
-        System.exit(0);
       } else {
         m_parent <- result(1 + m_r1 + m_r2);
       }
-      //self <- destroy();
     }
   }
 }

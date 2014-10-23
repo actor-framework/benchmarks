@@ -14,31 +14,27 @@ behavior worker {
     long n = task_n;
     long[] res = new long[2];
     int idx = 0;
+    long d = (long)2;
     if (n <= 3) {
       res[idx++] = n;
       res[idx++] = n;
       m_mc <- result(res);
-      return;
-    }
-    long d = (long)2;
-    while (d < n) {
-      if ((n % d) == 0) {
-        res[idx++] = d;
-        n /= d;
-      } else {
-        //d = (d == 2) ? 3 : (d + 2);
-        if (d == 2) {
-          d = (long)3;
+    } else {
+      while (d < n) {
+        if ((n % d) == 0) {
+          res[idx++] = d;
+          n /= d;
         } else {
-          d = d + 2;
+          //d = (d == 2) ? 3 : (d + 2);
+          if (d == 2) {
+            d = (long)3;
+          } else {
+            d = d + 2;
+          }
         }
       }
     }
     res[idx++] = d;
     m_mc <- result(res);
-  }
-
-  ack done() {
-    //self <- destroy();
   }
 }

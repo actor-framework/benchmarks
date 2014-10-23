@@ -36,7 +36,6 @@ behavior chain_master {
         self <- build_ring() @
         m_next <- _token(m_initial_token);
       } else {
-        m_factorizer <- done();
         m_mc <- masterdone();
       }
     } else {
