@@ -114,7 +114,7 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
   set(JAVAC_OPTS -cp "${CAF_SALSA_JAR}:." -d ${EXECUTABLE_OUTPUT_PATH})
   set(SALSA_OPTS -cp "${CAF_SALSA_JAR}:." salsa_lite.compiler.SalsaCompiler)
   message(STATUS "Add SALSA benchmarks to build (found java \"${JavaVersion}\")")
-  set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/salsa)
+  set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/salsa)
   macro(add_salsa_benchmark salsa_files java_files class_files)
     add_custom_command(OUTPUT ${java_files}
                        COMMAND ${CAF_JAVA_BIN} ${SALSA_OPTS} ${salsa_files}
