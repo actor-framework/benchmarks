@@ -5,6 +5,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_target(all_benchmarks ALL)
 
+set(CAF_COMPILED_BENCHES "")
+
 ################################################################################
 #                                   Utility                                    #
 ################################################################################
@@ -64,6 +66,9 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
                     SOURCES ${CAF_SCALA_SRC_FILES}
                     DEPENDS ${CAF_SCALA_OUT_FILES})
   add_dependencies(all_benchmarks scala_benchmarks)
+  set(CAF_COMPILED_BENCHES "scala ${CAF_COMPILED_BENCHES}")
+else()
+  set(CAF_SCALA_COMPILER "")
 endif()
 
 
@@ -107,6 +112,8 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
       set(CAF_NO_SALSA_BENCHMARKS yes)
     endif()
   endif()
+else()
+  set(CAF_SALSA_JAR "")
 endif()
 # add targets for SALSA benchmarks
 if(NOT CAF_NO_SALSA_BENCHMARKS)
@@ -176,6 +183,7 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
                             ${MIXED_CASE_CLASS_FILES}
                             ${MAILBOX_PERFORMANCE_CLASS_FILES})
   add_dependencies(all_benchmarks salsa_benchmarks)
+  set(CAF_COMPILED_BENCHES "salsa ${CAF_COMPILED_BENCHES}")
 endif()
 
 
@@ -211,6 +219,9 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
                     SOURCES ${CAF_ERLANG_SRC_FILES}
                     DEPENDS ${CAF_ERLANG_OUT_FILES})
   add_dependencies(all_benchmarks erlang_benchmarks)
+  set(CAF_COMPILED_BENCHES "erlang ${CAF_COMPILED_BENCHES}")
+else()
+  set(CAF_ERLANG_COMPILER "")
 endif()
 
 
@@ -265,12 +276,14 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
                     SOURCES ${CAF_CHARM_SRC_FILES}
                     DEPENDS ${CAF_CHARM_OUT_FILES})
   add_dependencies(all_benchmarks charm_benchmarks)
+  set(CAF_COMPILED_BENCHES "charm ${CAF_COMPILED_BENCHES}")
 else()
   # make files show up in GUI even if not building Charm++
   file(GLOB_RECURSE CHARM_SOURCES
        "${CMAKE_CURRENT_SOURCE_DIR}/charm++/*.cpp"
        "${CMAKE_CURRENT_SOURCE_DIR}/charm++/*.ci")
   add_custom_target(caf_charm_bench_dummy SOURCES ${MISC_FILES})
+  set(CAF_CHARM_COMPILER "")
 endif()
 
 
@@ -290,6 +303,7 @@ add_caf_benchmark(actor_creation)
 add_caf_benchmark(mailbox_performance)
 add_caf_benchmark(mixed_case)
 add_caf_benchmark(mandelbrot)
+set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
 
 
 ################################################################################
@@ -306,3 +320,15 @@ add_executable(caf_run_bench ${CMAKE_CURRENT_SOURCE_DIR}/tools/caf_run_bench.cpp
 target_link_libraries(caf_run_bench ${LIBCAF_LIBRARIES} ${LD_FLAGS})
 add_dependencies(all_benchmarks caf_run_bench)
 add_custom_target(caf_scripts_dummy SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run)
+
+
+################################################################################
+#                                   Scripts                                    #
+################################################################################
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/scripts/caf_run_benchmarks.in"
+               "${CMAKE_CURRENT_SOURCE_DIR}/scripts/caf_run_benchmarks"
+               @ONLY)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/scripts/run.in"
+               "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run"
+               @ONLY)

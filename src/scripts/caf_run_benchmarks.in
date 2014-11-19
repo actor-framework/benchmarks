@@ -1,0 +1,49 @@
+#!/bin/bash
+
+CAF_HOME=@CMAKE_HOME_DIRECTORY@
+CAF_BINS=$CAF_HOME/build/bin
+
+OUT_DIR=/local_data
+
+if [[ $# -ne 1 ]]; then
+  echo "usage ./caf_run_benchmarks USERID
+  USERID: ID of the user this benchmark should run as"
+  exit
+fi
+
+CAF_BENCH_USER=$1
+
+# arguments for all benchmarks
+mixed_case="100 100 1000 4"
+actor_creation="20"
+mailbox_performance="100 1000000"
+mandelbrot="16000"
+
+MaxCores=$(lscpu | grep -E "^CPU\(s\)" | grep -oE "[0-9]+")
+NumCPUs=$(lscpu | grep -E "^Socket\(s\)" | grep -oE "[0-9]+")
+CoresPerCPU=$(echo "$MaxCores / $NumCPUs" | bc)
+
+for lang in @CAF_COMPILED_BENCHES@; do
+  if [ -d "${SALSA_HOME}" ]; then
+    echo "SALSA_HOME not set"
+    exit
+  fi
+  for NumCores in $(seq $NumCPUs $NumCPUs $MaxCores) ; do
+    $CAF_HOME/benchmarks/scripts/activate_cores $NumCores
+    fname=$(printf "%.2i_cores" $NumCores)
+    for bench in mixed_case actor_creation mailbox_performance ; do
+      echo "$lang: $bench @ $NumCores cores"
+      args=${!bench}
+      runtimes="$OUT_DIR/${fname}_runtime_${lang}_${bench}.txt"
+      for i in {1..10} ; do
+        memfile="$OUT_DIR/${fname}_memory_${i}_${lang}_${bench}.txt"
+        if [ -f "$memfile" ] ; then
+          echo "SKIP $lang $bench $i (mem file already exists)"
+        else
+          $CAF_HOME/benchmarks/scripts/run $CAF_BENCH_USER $CAF_BINS $runtimes $memfile $lang $bench $args
+        fi
+      done
+    done
+  done
+done
+

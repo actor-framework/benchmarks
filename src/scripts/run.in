@@ -10,8 +10,7 @@ mem_poll_interval_ms=50
 max_trials=3
 
 # configure this for your system
-#scala_home=/opt/local/share/scala-2.10
-scala_home=/home/neverlord/mobi8/scala-2.10.3
+scala_home=@CAF_SCALA_COMPILER@
 
 # classpath for ActorFoundry
 foundry_home=/home/neverlord/actor-framework/benchmarks/actor_foundry
@@ -24,7 +23,7 @@ usage: $0 USERID BIN_PATH RUNTIME_FILE MEM_USAGE_FILE IMPL BENCH BENCH_ARGS
   BIN_PATH:       path to CAF binaries
   RUNTIME_FILE:   output file for runtime
   MEM_USAGE_FILE: output file for memory consumption
-  IMPL:           (caf|scala|erlang|foundry|charm)
+  IMPL:           (caf|scala|erlang|foundry|charm|salsa)
   BENCH:          (mixed_case|actor_creation|mailbox_performance|mandelbrot)
 
 "
@@ -58,7 +57,7 @@ java_cmd=/usr/bin/java
 jvm_tuning="-Xmx10240M -Xms32M"
 erl_cmd=$(which erl)
 
-salsa_cp=/Users/neverlord/salsa_lite2.0.3.jar
+salsa_cp=@CAF_SALSA_JAR@
 
 case "$impl" in
   caf)
@@ -81,7 +80,7 @@ case "$impl" in
     cmd="$java_cmd -cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
     ;;
   salsa)
-    cmd="$java_cmd $jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores org.caf.salsa.${bench} $@"
+    cmd="$java_cmd $jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores ${bench} $@"
     ;;
   *)
     echo "invalid argument: $impl"; echo; echo "$usage"
