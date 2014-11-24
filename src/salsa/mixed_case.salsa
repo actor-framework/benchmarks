@@ -1,29 +1,20 @@
-//module org.caf.salsa;
-
-//import salsa_lite.io.StandardOutput;
-
 behavior mixed_case {
-  int            m_num_rings           = 0;
-  int            m_ring_size           = 0;
-  int            m_initial_token_value = 0;
-  int            m_repetitions         = 0;
-
   mixed_case(String[] args) {
     if (args.length != 4) {
       //standardOutput <- println("usage: mixed_case NUM_RINGS " +
       //                          "RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS");
-      System.exit(0);
+      System.exit(1);
     }
-    m_num_rings           = Integer.parseInt(args[0]);
-    m_ring_size           = Integer.parseInt(args[1]);
-    m_initial_token_value = Integer.parseInt(args[2]);
-    m_repetitions         = Integer.parseInt(args[3]);
-    int num_msgs  = m_num_rings + (m_num_rings * m_repetitions);
-    supervisor sv = new supervisor(num_msgs);
-    chain_master[] masters = new chain_master[m_num_rings];
-    for (int i = 0; i < m_num_rings; ++i) {
-      masters[i] = new chain_master(sv, m_ring_size, m_initial_token_value,
-                                    m_repetitions);
+    int nurings             = Integer.parseInt(args[0]);
+    int ring_size           = Integer.parseInt(args[1]);
+    int initial_token_value = Integer.parseInt(args[2]);
+    int repetitions         = Integer.parseInt(args[3]);
+    int numsgs              = nurings + (nurings * repetitions);
+    supervisor sv           = new supervisor(numsgs);
+    chain_master[] masters  = new chain_master[nurings];
+    for (int i = 0; i < nurings; ++i) {
+      masters[i] = new chain_master(sv, ring_size, initial_token_value,
+                                    repetitions);
     }
   }
 }

@@ -17,24 +17,20 @@ behavior chain_master {
     m_ring_size   = ring_size;
     m_repetitions = repetitions;
     m_initial_token = initial_token;
-    m_factorizer <- calc();
-    self <- build_ring() @
-    self <- _token(m_initial_token);
-  }
-
-  ack build_ring() {
-    m_next = null;
-    for (int i = 1; i < m_ring_size; ++i) {
-      m_next = new chain_link(m_next, self);
-    }
+    self <- _token(m_initial_token + 1);
   }
 
   ack _token(int y) {
+    if (m_next == null) {
+      for (int i = 1; i < m_ring_size; ++i) {
+        m_next = new chain_link(m_next, self);
+      }
+      m_factorizer <- calc();
+    }
     if (y == 0) {
+      m_next = null;
       if (++m_iteration < m_repetitions) {
-        m_factorizer <- calc();
-        self <- build_ring() @
-        m_next <- _token(m_initial_token);
+        self <- _token(m_initial_token + 1);
       } else {
         m_mc <- masterdone();
       }

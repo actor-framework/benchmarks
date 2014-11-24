@@ -1,8 +1,6 @@
-//module org.caf.salsa;
-
 behavior worker {
-  long factor1 = (long)86028157;
-  long factor2 = (long)329545133;
+  long factor1 = (long) 86028157;
+  long factor2 = (long) 329545133;
   long task_n  = factor1 * factor2;
   supervisor m_mc = null;
 
@@ -14,20 +12,15 @@ behavior worker {
     long n = task_n;
     long[] res = new long[2];
     int idx = 0;
-    long d = (long)2;
-    if (n <= 3) {
-      res[idx++] = n;
-      res[idx++] = n;
-      m_mc <- result(res);
-    } else {
+    long d = (long) 2;
+    if (n > 3) {
       while (d < n) {
         if ((n % d) == 0) {
           res[idx++] = d;
           n /= d;
         } else {
-          //d = (d == 2) ? 3 : (d + 2);
           if (d == 2) {
-            d = (long)3;
+            d = (long) 3;
           } else {
             d = d + 2;
           }

@@ -1,5 +1,3 @@
-//module org.caf.salsa;
-
 behavior supervisor {
   int m_left = 0;
 
@@ -9,24 +7,13 @@ behavior supervisor {
 
   ack masterdone() {
     if (--m_left == 0) {
-      //destory();
       System.exit(0);
     }
   }
 
   ack result(long[] vec) {
-    //check_factors(vec);
     if (--m_left == 0) {
-      //self <- destroy();
       System.exit(0);
     }
   }
-
-  /*void check_factors(long[] vec) {
-    if (vec.length != 2 || vec[0] != mixed_caseState.s_factor1 ||
-        vec[1] != mixed_caseState.s_factor2) {
-      // error...
-      System.out.println("ERROR");
-    }
-  }*/
 }
