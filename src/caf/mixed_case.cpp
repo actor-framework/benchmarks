@@ -176,6 +176,7 @@ int main(int argc, char** argv) {
   if (argc != 5) {
     usage();
   }
+  announce<factors>("factors");
   int num_rings = 0;
   int ring_size;
   int initial_token_value;
