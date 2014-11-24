@@ -14,7 +14,7 @@ behavior mixed_case {
     chain_master[] masters  = new chain_master[nurings];
     for (int i = 0; i < nurings; ++i) {
       masters[i] = new chain_master(sv, ring_size, initial_token_value,
-                                    repetitions);
+                                    repetitions) on (i);
     }
   }
 }

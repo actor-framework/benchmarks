@@ -1,12 +1,6 @@
-//module org.caf.salsa;
-
-//import salsa_lite.io.StandardOutput; // not found...
-
 behavior actor_creation {
-  int            m_num    = 0;
-  actor_creation m_master = null; /* master actor */
-  int            m_reach  = 0;
   actor_creation m_parent = null;
+  int            m_num    = 0;
   int            m_r1     = 0;
   int            m_r2     = 0;
 
@@ -17,23 +11,22 @@ behavior actor_creation {
       System.exit(0);
     }
     m_num = Integer.parseInt(argv[0]);
-    m_master = self;
-    m_master <- spread(m_master, m_num);
+    self <- spread(m_num);
   }
 
-  actor_creation(actor_creation master, int num) {
-    m_num    = num;
-    m_master = master;
-  }
-
-  ack spread(actor_creation _parent, int x) {
+  actor_creation(actor_creation _parent, int num) {
     m_parent = _parent;
+    m_num    = num;
+  }
+
+  ack spread(int x) {
     if (x == 1) {
-      _parent <- result(1);
+      m_parent <- result(1);
+      m_parent = null;
     } else {
       int msg = x - 1;
-      new actor_creation(m_master, m_num) <- spread(self, msg);
-      new actor_creation(m_master, m_num) <- spread(self, msg);
+      new actor_creation(self, m_num) <- spread(msg);
+      new actor_creation(self, m_num) <- spread(msg);
     }
   }
 
@@ -41,26 +34,21 @@ behavior actor_creation {
     if      (m_r1 == 0) m_r1 = r;
     else if (m_r2 == 0) m_r2 = r;
     if (m_r1 != 0 && m_r2 != 0) {
-      if (m_parent == m_master) {
-        if (m_reach++ <= 2) {
-          /* 2 child actors refer to master actor, but we just wanna validate
-             if we reached the master again
-           */
-          m_parent <- result(1 + m_r1 + m_r2);
-        } else {
-          int result   = 2 + m_r1 + m_r2;
-          int expected = (1 << m_num);
-          if (result != expected) {
-            String str = "expected: " + expected + " found: " + result;
-            //standardOutput <− println(str); // why is this not working...?
-            System.out.println(str);
-          }
-          // I don't know a better way. We don't want to keep
-          // the WWCReceptionService running.
-          System.exit(0);
+      if (m_parent == null) {
+        int result   = 2 + m_r1 + m_r2;
+        int expected = (1 << m_num);
+        if (result != expected) {
+          String str = "expected: " + expected + " found: " + result;
+          //standardOutput <− println(str); // why is this not working...?
+          System.out.println(str);
         }
+        // I don't know a better way. We don't want to keep
+        // the WWCReceptionService running.
+        System.out.println("Result is: " + result);
+        System.exit(0);
       } else {
         m_parent <- result(1 + m_r1 + m_r2);
+        m_parent = null;
       }
     }
   }

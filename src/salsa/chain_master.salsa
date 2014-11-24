@@ -13,7 +13,7 @@ behavior chain_master {
                int initial_token, int repetitions) {
     m_iteration   = 0;
     m_mc          = msgcollector;
-    m_factorizer  = new worker(m_mc);
+    m_factorizer  = new worker(m_mc) on (-1);
     m_ring_size   = ring_size;
     m_repetitions = repetitions;
     m_initial_token = initial_token;
@@ -23,7 +23,7 @@ behavior chain_master {
   ack _token(int y) {
     if (m_next == null) {
       for (int i = 1; i < m_ring_size; ++i) {
-        m_next = new chain_link(m_next, self);
+        m_next = new chain_link(m_next, self) on (self.getStageId());
       }
       m_factorizer <- calc();
     }
