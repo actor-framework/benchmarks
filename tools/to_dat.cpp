@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         {"erlang", "Erlang"}
     };
     vector<string> files(argv + 1, argv + argc);
-    regex fname_regex("([0-9]+).*cores.*(caf|scala|salsa|theron|erlang|go|foundry|charm).*(actor_creation|mailbox_performance|mixed_case).txt");
+    regex fname_regex("([0-9]+)_cores_runtime_(caf|scala|salsa|theron|erlang|go|foundry|charm)_([a-zA-Z_]+)\\.txt");
     smatch fname_match;
     // $benchmark => {$lang => {$num_cores => [$values]}}
     map<string, map<string, map<size_t, vector<double>>>> samples;
@@ -99,16 +99,22 @@ int main(int argc, char** argv) {
         cout << "... nothing to do ..." << endl;
         return 0;
     }
+    // calculate filed width from maximum field name + "_yerr"
+    string yerr_suffix = "_yerr";
+    size_t field_width = 0;
+    for (auto& nn : nice_names) {
+        field_width = max(field_width, nn.second.size() + yerr_suffix.size());
+    }
     for (auto& kvp : samples) {
         auto& benchmark = kvp.first;
-        string file_header = "cores";
+        ostringstream tmp;
+        tmp << left;
+        tmp << setw(field_width) << "cores";
         map<size_t, map<string, pair<double, double>>> output_table;
         for (auto& kvp2 : kvp.second) {
             auto& lang = kvp2.first;
-            file_header += " ";
-            file_header += nice_names[lang];
-            file_header += " ";
-            file_header += nice_names[lang] + "_yerr";
+            tmp << " " << setw(field_width) << nice_names[lang]
+                << " " << setw(field_width) << (nice_names[lang] + yerr_suffix);
             for (auto& kvp3 : kvp2.second) {
                 auto num_cores = kvp3.first;
                 statistics stats{kvp3.second};
@@ -116,13 +122,16 @@ int main(int argc, char** argv) {
                 output_table[num_cores][lang] = make_pair(stats.mean, yerr);
             }
         }
+        auto file_header = tmp.str();
         ofstream oss{benchmark + ".dat"};
+        oss << left;
         oss << file_header << endl;
         for (auto& output_kvp : output_table) {
-            oss << output_kvp.first; // number of cores
+            oss << setw(field_width) << output_kvp.first; // number of cores
             for (auto& inner_kvp : output_kvp.second) {
-                oss << " " << inner_kvp.second.first   // mean
-                    << " " << inner_kvp.second.second; // 95% confidence interval
+                // print mean and 95% confidence interval
+                oss << " " << setw(field_width) << inner_kvp.second.first
+                    << " " << setw(field_width) << inner_kvp.second.second;
             }
             oss << endl;
         }
