@@ -63,6 +63,7 @@ int main(int argc, char** argv) {
     map<string, string> nice_names {
         {"caf", "CAF"},
         {"scala", "Scala"},
+        {"salsa", "SalsaLite"},
         {"theron", "Theron"},
         {"go", "GoLang"},
         {"charm", "Charm"},
@@ -70,7 +71,7 @@ int main(int argc, char** argv) {
         {"erlang", "Erlang"}
     };
     vector<string> files(argv + 1, argv + argc);
-    regex fname_regex("([0-9]+).*cores.*(caf|scala|theron|erlang|go|foundry|charm).*(actor_creation|mailbox_performance|mixed_case).txt");
+    regex fname_regex("([0-9]+).*cores.*(caf|scala|salsa|theron|erlang|go|foundry|charm).*(actor_creation|mailbox_performance|mixed_case).txt");
     smatch fname_match;
     // $benchmark => {$lang => {$num_cores => [$values]}}
     map<string, map<string, map<size_t, vector<double>>>> samples;
