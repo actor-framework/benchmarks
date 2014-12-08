@@ -1,0 +1,35 @@
+behavior mandelbrot_worker {
+  ack kickoff(double[] cr0, mandelbrot master, int y, int height, int max_x,
+              int max_iterations, double limit_sq) {
+    double ci0 = 2.0 * y / height - 1.0;
+    for (int x = 0; x < max_x; ++x) {
+      int cr0_x = 8 * x;
+      double[] cr = new double[8];
+      double[] ci = new double[8];
+      for (int k = 0; k < 8; ++k) {
+        cr[k] = cr0[cr0_x + k];
+        ci[k] = ci0;
+      }
+
+      byte bits = (byte)0xFF;
+      for (int i = 0; bits != 0 && i < max_iterations; ++i) {
+        byte bit_k = (byte)0x80;
+        for (int k = 0; k < 8; ++k) {
+          if ((bits & bit_k) != 0) {
+            double cr_k    = cr[k];
+            double ci_k    = ci[k];
+            double cr_k_sq = cr_k * cr_k;
+            double ci_k_sq = ci_k * ci_k;
+            cr[k] = cr_k_sq - ci_k_sq + cr0[cr0_x + k];
+            ci[k] = 2.0 * cr_k * ci_k + ci0;
+            if (cr_k_sq + ci_k_sq > limit_sq) {
+              bits ^= bit_k;
+            }
+          }
+          bit_k >>= 1;
+        }
+      }
+      master <- send_result(x, bits);
+    }
+  }
+}

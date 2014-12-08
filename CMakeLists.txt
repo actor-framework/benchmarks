@@ -176,12 +176,26 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
   add_salsa_benchmark("${MAILBOX_PERFORMANCE_SALSA_FILES}"
                       "${MAILBOX_PERFORMANCE_JAVA_FILES}"
                       "${MAILBOX_PERFORMANCE_CLASS_FILES}")
+  # mandelbrot
+  set(MANDELBROT_SALSA_FILES
+      ${SRC_DIR}/mandelbrot.salsa
+      ${SRC_DIR}/mandelbrot_worker.salsa)
+  set(MANDELBROT_JAVA_FILES
+      ${SRC_DIR}/mandelbrot.java
+      ${SRC_DIR}/mandelbrot_worker.java)
+  set(MANDELBROT_CLASS_FILES
+      ${CLASS_PATH}/mandelbrot.class
+      ${CLASS_PATH}/mandelbrot_worker.class)
+  add_salsa_benchmark("${MANDELBROT_SALSA_FILES}"
+                      "${MANDELBROT_JAVA_FILES}"
+                      "${MANDELBROT_CLASS_FILES}")
   file(GLOB_RECURSE SALSA_SOURCES "${SRC_DIR}/*.salsa")
   add_custom_target(salsa_benchmarks
                     SOURCES ${SALSA_SOURCES}
                     DEPENDS ${ACTOR_CREATION_CLASS_FILES}
                             ${MIXED_CASE_CLASS_FILES}
-                            ${MAILBOX_PERFORMANCE_CLASS_FILES})
+                            ${MAILBOX_PERFORMANCE_CLASS_FILES}
+                            ${MANDELBROT_CLASS_FILES})
   add_dependencies(all_benchmarks salsa_benchmarks)
   set(CAF_COMPILED_BENCHES "salsa ${CAF_COMPILED_BENCHES}")
 endif()

@@ -1,0 +1,42 @@
+behavior mandelbrot {
+  byte[] buffer = null;
+  int expected_results = 0;
+
+  mandelbrot(String[] args) {
+    if (args.length != 1) {
+      System.out.println("usage: mandelbrot N");
+      System.exit(-1);
+    }
+
+    int N                = Integer.parseInt(args[0]);
+    int width            = N;
+    int height           = N;
+    int max_x            = (width + 7) / 8;
+    int max_iterations   = 250;
+    double limit         = 2.0;
+    double limit_sq      = limit * limit;
+    expected_results = max_x * height;
+
+    buffer = new byte[height * max_x];
+    double[] cr0    = new double[8 * max_x];
+
+    for (int x = 0; x < max_x; ++x) {
+      for (int k = 0; k < 8; ++k) {
+        int xk = 8 * x + k;
+        cr0[xk] = (2.0 * xk) / width - 1.5;
+      }
+    }
+
+    for (int y = 0; y < height; ++y) {
+      new mandelbrot_worker() <- kickoff(cr0, self, y, height, max_x,
+                                         max_iterations, limit_sq);
+    }
+  }
+
+  ack send_result(int x, byte bits) {
+    buffer[x] = bits;
+    if (--expected_results == 0) {
+      System.exit(0);
+    }
+  }
+}
