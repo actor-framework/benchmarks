@@ -31,8 +31,8 @@ namespace { uint32_t s_num; }
 
 behavior testee(event_based_actor* self, actor parent) {
   return {
-    on(atom("spread"), (uint32_t) 1) >> [=] {
-      self->send(parent, atom("result"), (uint32_t) 1);
+    on(atom("spread"), uint32_t{1}) >> [=] {
+      self->send(parent, atom("result"), uint32_t{1});
       self->quit();
     },
     on(atom("spread"), arg_match) >> [=](uint32_t x) {

@@ -95,6 +95,7 @@ class chain_master : public event_based_actor {
       m_factorizer = spawn<detached>(worker);
       new_ring();
     }
+    ~chain_master();
     behavior make_behavior() override {
       return {
         on(atom("token"), arg_match) >> [=](uint64_t& value) {
@@ -131,11 +132,16 @@ class chain_master : public event_based_actor {
   actor m_factorizer;
 };
 
+chain_master::~chain_master() {
+  // nop
+}
+
 class supervisor : public event_based_actor{
  public:
   supervisor(int num_msgs) : m_left(num_msgs) {
     // nop
   }
+  ~supervisor();
   behavior make_behavior() override {
     return {
       on(atom("masterdone")) >> [=] {
@@ -154,6 +160,10 @@ class supervisor : public event_based_actor{
  private:
   int m_left;
 };
+
+supervisor::~supervisor() {
+  // nop
+}
 
 int main(int argc, char** argv) {
   if (argc != 5) {

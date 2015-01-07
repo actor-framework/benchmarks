@@ -16,30 +16,30 @@ int main(int argc, char* argv[]) {
     cout << "usage: ./" << argv[0] << " N" << endl;
     return 0;
   }
-  const int    N              = atoi(argv[1]);
-  const int    width          = N;
-  const int    height         = N;
-  const int    max_x          = (width + 7) / 8;
-  const int    max_iterations = 250;
+  const size_t N              = static_cast<size_t>(atoi(argv[1]));
+  const size_t width          = N;
+  const size_t height         = N;
+  const size_t max_x          = (width + 7) / 8;
+  const size_t max_iterations = 250;
   const double limit          = 2.0;
   const double limit_sq       = limit * limit;
 
   vector<byte> buffer(height * max_x);
   vector<double> cr0(8 * max_x);
 
-  for (int x = 0; x < max_x; ++x) {
-    for (int k = 0; k < 8; ++k) {
-      const int xk = 8 * x + k;
+  for (size_t x = 0; x < max_x; ++x) {
+    for (size_t k = 0; k < 8; ++k) {
+      const size_t xk = 8 * x + k;
       cr0[xk] = (2.0 * xk) / width - 1.5;
     }
   }
 
 
-  for (int y = 0; y < height; ++y) {
+  for (size_t y = 0; y < height; ++y) {
     byte* line = &buffer[y * max_x];
     spawn([=] {
       const double ci0 = 2.0 * y / height - 1.0;
-      for (int x = 0; x < max_x; ++x) {
+      for (size_t x = 0; x < max_x; ++x) {
         const double* cr0_x = &cr0[8 * x];
         double cr[8];
         double ci[8];
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
             ci[k] = ci0;
         }
         byte bits = 0xFF;
-        for (int i = 0; bits && i < max_iterations; ++i) {
+        for (size_t i = 0; bits && i < max_iterations; ++i) {
           byte bit_k = 0x80;
           for (int k = 0; k < 8; ++k) {
             if (bits & bit_k) {

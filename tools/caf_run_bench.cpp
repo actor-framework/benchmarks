@@ -33,7 +33,7 @@ bool print_rss(OutStream& out, string&, const string&, pid_t child) {
   }
   task_basic_info_data_t basic_info;
   mach_msg_type_number_t count = TASK_BASIC_INFO_COUNT;
-  if (task_info(child_task, TASK_BASIC_INFO, (task_info_t) &basic_info, &count) != KERN_SUCCESS) {
+  if (task_info(child_task, TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&basic_info), &count) != KERN_SUCCESS) {
     return false;
   }
   auto rss = static_cast<unsigned long long>(basic_info.resident_size);
@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
   if (argc < 7) {
     usage();
   }
-  int userid = rd_int(argv[1]);
+  uid_t userid = static_cast<uid_t>(rd_int(argv[1]));
   int max_runtime = rd_int(argv[2]);
   int poll_interval = rd_int(argv[3]);
   string runtime_out_fname = argv[4];

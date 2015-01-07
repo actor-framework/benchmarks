@@ -32,6 +32,7 @@ class receiver : public event_based_actor {
     receiver(uint64_t max) : m_max(max), m_value(0) {
       // nop
     }
+    virtual ~receiver();
     behavior make_behavior() override {
       return {
         on(atom("msg")) >> [=] {
@@ -45,6 +46,10 @@ class receiver : public event_based_actor {
   uint64_t m_max;
   uint64_t m_value;
 };
+
+receiver::~receiver() {
+  // nop
+}
 
 void sender(actor whom, uint64_t count) {
   if (!whom) return;
@@ -73,7 +78,8 @@ int main(int argc, char** argv) {
     usage();
   }
   try {
-    run(stoll(argv[1]), stoll(argv[2]));
+    run(static_cast<uint64_t>(stoll(argv[1])),
+        static_cast<uint64_t>(stoll(argv[2])));
   }
   catch (std::exception&) {
     usage();
