@@ -11,13 +11,18 @@
 #include <iostream>
 #include <algorithm>
 
+// for CAF_PUSH_WARNINGS
+#include "caf/config.hpp"
+
+CAF_PUSH_WARNINGS
 #include <boost/math/distributions/students_t.hpp>
+CAF_POP_WARNINGS
 
 using namespace std;
 
 struct variance_plus {
   double mean;
-  variance_plus(double mean) : mean(mean) {
+  variance_plus(double mean_value) : mean(mean_value) {
     // nop
   }
   double operator()(double res, double a) {
@@ -75,7 +80,7 @@ struct benchmark_file {
 
 bool bench_name_cmp(const benchmark_file& lhs, const benchmark_file& rhs) {
   return lhs.benchmark_name < rhs.benchmark_name;
-};
+}
 
 bool has_runtime_values(const benchmark_file& bf) {
   return bf.type == runtime_values;
@@ -89,7 +94,7 @@ constexpr char newline = '\n';
 
 constexpr char yerr_suffix[] = "_yerr";
 
-constexpr size_t yerr_suffix_size = 5;
+constexpr int yerr_suffix_size = 5;
 
 class application {
  public:
@@ -108,9 +113,10 @@ class application {
                    "([a-zA-Z_]+)\\.txt"},
         m_field_width{0} {
     for (auto& nn : m_nice_names) {
-      m_field_width = max(m_field_width, nn.second.size() + yerr_suffix_size);
+      m_field_width = max(m_field_width, static_cast<int>(nn.second.size())
+                                         + yerr_suffix_size);
     }
-    m_empty_field.assign(m_field_width, ' ');
+    m_empty_field.assign(static_cast<size_t>(m_field_width), ' ');
   }
   using iterator = vector<benchmark_file>::iterator;
   void run(vector<string> fnames) {
@@ -303,10 +309,10 @@ class application {
     return {};
   }
 
-  regex m_fname_rx;
   map<string, string> m_nice_names;
+  regex m_fname_rx;
   vector<string> m_benchmarks;
-  size_t m_field_width;
+  int m_field_width;
   string m_empty_field;
 };
 
