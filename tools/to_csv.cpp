@@ -72,7 +72,7 @@ enum benchmark_file_type {
 
 struct benchmark_file {
   string path;
-  size_t num_cores;
+  size_t num_units;
   benchmark_file_type type;
   string framework;
   string benchmark_name;
@@ -96,6 +96,11 @@ constexpr char yerr_suffix[] = "_yerr";
 
 constexpr int yerr_suffix_size = 5;
 
+constexpr char file_name_format[] = "([0-9]+)_(cores|machines)_"
+                                    "(runtime|memory_[0-9]+)_"
+                                    "([a-zA-Z]+)_"
+                                    "([a-zA-Z_]+)\\.txt";
+
 class application {
  public:
   application()
@@ -106,11 +111,9 @@ class application {
                      {"go",      "GoLang"},
                      {"charm",   "Charm"},
                      {"foundry", "ActorFoundry"},
-                     {"erlang",  "Erlang"}},
-        m_fname_rx{"([0-9]+)_cores_"
-                   "(runtime|memory_[0-9]+)_"
-                   "(caf|scala|salsa|theron|erlang|go|foundry|charm)_"
-                   "([a-zA-Z_]+)\\.txt"},
+                     {"erlang",  "Erlang"},
+                     {"mpi",     "MPI"}},
+        m_fname_rx{file_name_format},
         m_field_width{0} {
     for (auto& nn : m_nice_names) {
       m_field_width = max(m_field_width, static_cast<int>(nn.second.size())
@@ -124,16 +127,17 @@ class application {
     auto parse_fname = [&](string& fname) -> benchmark_file {
       benchmark_file res;
       smatch rxres;
-      if (regex_match(fname, rxres, m_fname_rx) && rxres.size() == 5) {
-        res.num_cores = static_cast<size_t>(stoi(rxres.str(1)));
-        res.type = rxres.str(2) == "runtime" ? runtime_values : memory_values;
-        res.framework = rxres.str(3);
-        res.benchmark_name = rxres.str(4);
+      if (regex_match(fname, rxres, m_fname_rx) && rxres.size() == 6) {
+        res.num_units = static_cast<size_t>(stoi(rxres.str(1)));
+        m_unit_name = rxres.str(2);
+        res.type = rxres.str(3) == "runtime" ? runtime_values : memory_values;
+        res.framework = rxres.str(4);
+        res.benchmark_name = rxres.str(5);
         res.path = std::move(fname);
       } else {
         res.type = invalid_file;
         cerr << "*** file name \"" << fname
-             << "\" does not match regex" << endl;
+             << "\" does not match regex \"" << file_name_format << "\"" << endl;
       }
       return res;
     };
@@ -173,14 +177,14 @@ class application {
         return bf.benchmark_name != benchmark_name;
       };
       eor = find_if(first, last, different_benchmark); // end-of-range
-      // $framework => {$num_cores => [$values]}
+      // $framework => {$num_units => [$values]}
       map<string, map<size_t, vector<double>>> samples;
       for (; first != eor; ++first) {
         auto vals = content(first->path, 1);
         if (vals.empty()) {
           cerr << "*** no values found in " << first->path << endl;
         } else {
-          auto& out = samples[first->framework][first->num_cores];
+          auto& out = samples[first->framework][first->num_units];
           for (auto& row : vals) {
             // our raw files have milliseconds, we need convert to seconds
             out.push_back(row[0] / 1000.0);
@@ -191,18 +195,20 @@ class application {
       // calculate filed width from maximum field name + "_yerr"
       ostringstream tmp;
       tmp << left;
-      tmp << setw(m_field_width) << "cores";
+      tmp << setw(m_field_width) << m_unit_name;
       map<size_t, map<string, pair<double, double>>> output_table;
+      auto no_nice_name = m_nice_names.end();
       for (auto& kvp : samples) {
         auto& framework = kvp.first;
-        auto& nice_name = m_nice_names[framework];
-        tmp << "; " << setw(m_field_width) << nice_name
-            << "; " << setw(m_field_width) << (nice_name + yerr_suffix);
+        auto iter = m_nice_names.find(framework);
+        auto& out_name = (iter == no_nice_name) ? framework : iter->second;
+        tmp << "; " << setw(m_field_width) << out_name
+            << "; " << setw(m_field_width) << (out_name + yerr_suffix);
         for (auto& kvp2 : kvp.second) {
-          auto num_cores = kvp2.first;
+          auto num_units = kvp2.first;
           statistics stats{kvp2.second};
           auto yerr = kvp2.second.size() < 9 ? 0. : stats.conf_interval_95;
-          output_table[num_cores][framework] = make_pair(stats.mean, yerr);
+          output_table[num_units][framework] = make_pair(stats.mean, yerr);
         }
       }
       auto ofile_header = tmp.str();
@@ -210,7 +216,7 @@ class application {
       ofile << left;
       ofile << ofile_header << newline;
       for (auto& output_kvp : output_table) {
-        ofile << setw(m_field_width) << output_kvp.first; // number of cores
+        ofile << setw(m_field_width) << output_kvp.first; // number of units
         for (auto& inner_kvp : output_kvp.second) {
           // print mean and 95% confidence interval
           ofile << "; " << setw(m_field_width) << inner_kvp.second.first
@@ -314,6 +320,7 @@ class application {
   vector<string> m_benchmarks;
   int m_field_width;
   string m_empty_field;
+  string m_unit_name; // usually either "cores" or "machines"
 };
 
 int main(int argc, char** argv) {
