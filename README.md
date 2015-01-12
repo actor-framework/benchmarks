@@ -1,19 +1,24 @@
-# CAF Benchmarks
-## Build your benchmarks
-You may run all benchmarks with `sudo ./script/caf_run_benchmarks`.
+# CAF Benchmark Suite
+
+The CAF benchmark suite consits of a set of microbenchmarks implemented for various platforms and shell scripts to generate the results. Please note that the shell scripts are only tested under Linux.
+
+## Run Benchmark Suite
+
+You may run all benchmarks as root using `script/caf_run_benchmarks`.
 
 ## Scripts and Files
-Under `src` you can find the benchmark programs. All script files and a few source files we use to run the benchmarks are at located under `script`.
 
-* `script/caf_run_benchmarks`
-* `script/run` starts `caf_run_bench` with arguments for the benchmark implementations.
+Implementations of all benchmark programs can be found under `src/$PLATOFRM`. Utility scripts required to run the benchmark suite can be found in `scripts`. Note that some scripts are generated from `src/scripts` and are only available after the CMake setup.
 
-* `tools/caf_run_bench.cpp` writes benchmark results to `/local_data/`.
-* `tools/to_dat.cpp` converts your benchmark files into one, so you can plot them easily. 
+* `scripts/activate_cores` activates a given number of CPU cores
+* `script/run` starts a single benchmark program
+* `script/caf_run_benchmarks` runs the benchmark suite
 
-* `script/activate_cores`  allows you to turn cores on and off.
+The benchmark suite also contains two C++ tool applications.
+
+* `tools/caf_run_bench.cpp` measure runtime and memory consumption for a single benchmark program
+* `tools/to_dat.cpp` converts the raw output from `caf_run_bench` into CSV files that can be plottet
 
 ## Add a benchmark
-Add your implementation to `src` and adjust `run`. Therefore add a section under `case "$impl" in` for your benchmark.
 
-*Note: When you add an c++ benchmark, we recommend to use utility.hpp.*
+Add implementations for a new platform to `src/$PLATOFRM`, add the building steps to CMake, and adjust `run` by adding a section under `case "$impl" ...` for your benchmarks.
