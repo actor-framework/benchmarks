@@ -202,8 +202,8 @@ class application {
         auto& framework = kvp.first;
         auto iter = m_nice_names.find(framework);
         auto& out_name = (iter == no_nice_name) ? framework : iter->second;
-        tmp << "; " << setw(m_field_width) << out_name
-            << "; " << setw(m_field_width) << (out_name + yerr_suffix);
+        tmp << ", " << setw(m_field_width) << out_name
+            << ", " << setw(m_field_width) << (out_name + yerr_suffix);
         for (auto& kvp2 : kvp.second) {
           auto num_units = kvp2.first;
           statistics stats{kvp2.second};
@@ -212,15 +212,24 @@ class application {
         }
       }
       auto ofile_header = tmp.str();
+      // trime trailing whitespaces
+      ofile_header.erase(ofile_header.find_last_not_of(' ') + 1);
       ofstream ofile{benchmark_name + ".csv"};
       ofile << left;
       ofile << ofile_header << newline;
       for (auto& output_kvp : output_table) {
         ofile << setw(m_field_width) << output_kvp.first; // number of units
-        for (auto& inner_kvp : output_kvp.second) {
+        auto end_i = output_kvp.second.end();
+        auto last_i = end_i;
+        --last_i;
+        for (auto i = output_kvp.second.begin(); i != end_i; ++i) {
           // print mean and 95% confidence interval
-          ofile << "; " << setw(m_field_width) << inner_kvp.second.first
-                << "; " << setw(m_field_width) << inner_kvp.second.second;
+          ofile << ", " << setw(m_field_width) << i->second.first << ", ";
+          // supress trailing whitespaces
+          if (i != last_i) {
+            ofile << setw(m_field_width);
+          }
+          ofile << i->second.second;
         }
         ofile << newline;
       }
@@ -263,7 +272,7 @@ class application {
         auto& framework = kvp.first;
         auto& nice_name = m_nice_names[framework];
         if (!at_begin) {
-          tmp << ";";
+          tmp << ",";
         } else {
           at_begin = false;
         }
@@ -278,7 +287,7 @@ class application {
         auto iter = samples.begin();
         for (size_t row = 0; row < samples.size(); ++row) {
           if (row > 0) {
-            ofile << ";";
+            ofile << ",";
           }
           if (col < iter->second.size()) {
             ofile << iter->second[col];
