@@ -18,7 +18,9 @@ macro(add_xxx_benchmark benchname dir name src_ending bin_ending out_path)
   set(CAF_${benchname}_${name}_OUT ${OUT_FILE})
   set(CAF_${benchname}_OUT_FILES ${OUT_FILE} ${CAF_${benchname}_OUT_FILES})
   add_custom_command(OUTPUT ${OUT_FILE}
-                     COMMAND ${CAF_${benchname}_COMPILER} ${CAF_${benchname}_COMPILER_OPTS} ${SRC_FILE}
+                     COMMAND ${CAF_${benchname}_COMPILER}
+                             ${CAF_${benchname}_COMPILER_OPTS}
+                             ${SRC_FILE}
                      DEPENDS ${SRC_FILE} ${ARGN}
                      WORKING_DIRECTORY ${EXECUTABLE_OUTPUT_PATH}
                      VERBATIM)
@@ -41,17 +43,18 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
     string(REGEX REPLACE ".*version ([0-9]+\\.[0-9]+\\.[0-9]+).*" "\\1"
            ScalacVersion "${ScalacVersionStr}")
     if(ScalacVersion VERSION_LESS 2.10)
-      message(STATUS "Disable Scala benchmarks: version >= 2.10 required, ${ScalacVersion} found")
+      message(STATUS "Disable Scala benchmarks: version >= 2.10 required,"
+                     "${ScalacVersion} found")
       set(CAF_NO_SCALA_BENCHMARKS yes)
     endif()
   else()
-    message(STATUS "Disable Scala benchmarks: could not find a running compiler")
+    message(STATUS "Disable Scala benchmarks: no running compiler found")
     set(CAF_NO_SCALA_BENCHMARKS yes)
   endif()
 endif()
 # add targets for Scala benchmarks
 if(NOT CAF_NO_SCALA_BENCHMARKS)
-  message(STATUS "Add Scala benchmarks to build (found version \"${ScalacVersion}\")")
+  message(STATUS "Add Scala benchmarks to build (found ${ScalacVersion})")
   set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf/scala)
   set(CAF_SCALA_COMPILER_OPTS -optimize)
   macro(add_scala_benchmark name)
@@ -120,7 +123,7 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
   set(CLASS_PATH ${EXECUTABLE_OUTPUT_PATH}/org/caf/salsa)
   set(JAVAC_OPTS -cp "${CAF_SALSA_JAR}:." -d ${EXECUTABLE_OUTPUT_PATH})
   set(SALSA_OPTS -cp "${CAF_SALSA_JAR}:." salsa_lite.compiler.SalsaCompiler)
-  message(STATUS "Add SALSA benchmarks to build (found java \"${JavaVersion}\")")
+  message(STATUS "Add SALSA benchmarks to build (found ${JavaVersion})")
   set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/salsa)
   macro(add_salsa_benchmark salsa_files java_files class_files)
     add_custom_command(OUTPUT ${java_files}
@@ -214,7 +217,7 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
                   RESULT_VARIABLE ErlangResult
                   ERROR_VARIABLE ErlangVersionStr)
   if(NOT ErlangResult EQUAL 0)
-      message(STATUS "Disable Erlang benchmarks: could not find a running compiler")
+      message(STATUS "Disable Erlang benchmarks: no running compiler found")
     set(CAF_NO_ERLANG_BENCHMARKS yes)
   endif()
 endif()
@@ -223,7 +226,8 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
   message(STATUS "Add Erlang benchmarks to build")
   set(CAF_ERLANG_COMPILER_OPTS "+native" "+{hipe, [o3]}")
   macro(add_erlang_benchmark name)
-    add_xxx_benchmark(ERLANG erlang ${name} erl beam ${EXECUTABLE_OUTPUT_PATH} ${ARGN})
+    add_xxx_benchmark(ERLANG erlang ${name} erl beam
+                      "${EXECUTABLE_OUTPUT_PATH}" ${ARGN})
   endmacro()
   add_erlang_benchmark(actor_creation)
   add_erlang_benchmark(mailbox_performance)
@@ -251,7 +255,7 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
                   RESULT_VARIABLE CharmResult
                   ERROR_VARIABLE CharmVersionStr)
   if(NOT CharmResult EQUAL 0)
-      message(STATUS "Disable Charm++ benchmarks: could not find a running compiler")
+      message(STATUS "Disable Charm++ benchmarks: no running compiler found")
     set(CAF_NO_CHARM_BENCHMARK yes)
   endif()
 endif()
@@ -263,7 +267,8 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
   macro(add_charm_benchmark name)
     set(longname charm_${name})
     set(longpath ${CAF_CHARM_PATH}/${longname})
-    set(CAF_CHARM_SRC_FILES ${longpath}.ci ${longpath}.cpp ${CAF_CHARM_SRC_FILES})
+    set(CAF_CHARM_SRC_FILES ${longpath}.ci
+                            ${longpath}.cpp ${CAF_CHARM_SRC_FILES})
     add_custom_command(OUTPUT ${longpath}.def.h ${longpath}.decl.h
                        COMMAND ${CAF_CHARM_COMPILER} ${longpath}.ci
                        DEPENDS ${longpath}.ci
@@ -277,7 +282,8 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
     set(exe_file ${EXECUTABLE_OUTPUT_PATH}/${longname})
     set(CAF_CHARM_OUT_FILES ${exe_file} ${CAF_CHARM_OUT_FILES})
     add_custom_command(OUTPUT ${exe_file}
-                       COMMAND ${CAF_CHARM_COMPILER} ${longpath}.o -o ${exe_file} -O3 -language charm++
+                       COMMAND ${CAF_CHARM_COMPILER} ${longpath}.o
+                               -o ${exe_file} -O3 -language charm++
                        DEPENDS ${longpath}.o
                        WORKING_DIRECTORY ${CAF_CHARM_PATH}
                        VERBATIM)
@@ -301,7 +307,6 @@ else()
 endif()
 
 
-
 ################################################################################
 #                                     CAF                                      #
 ################################################################################
@@ -317,7 +322,16 @@ add_caf_benchmark(actor_creation)
 add_caf_benchmark(mailbox_performance)
 add_caf_benchmark(mixed_case)
 add_caf_benchmark(mandelbrot)
+add_caf_benchmark(micro)
 set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
+
+
+################################################################################
+#                          some environment variables                          #
+################################################################################
+
+set(TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 
 
 ################################################################################
@@ -327,13 +341,13 @@ set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
 find_package(Boost)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
-  add_executable(to_csv ${CMAKE_CURRENT_SOURCE_DIR}/tools/to_csv.cpp)
+  add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
   target_link_libraries(to_csv ${LD_FLAGS})
 endif()
-add_executable(caf_run_bench ${CMAKE_CURRENT_SOURCE_DIR}/tools/caf_run_bench.cpp)
+add_executable(caf_run_bench "${TOOLS_DIR}/caf_run_bench.cpp")
 target_link_libraries(caf_run_bench ${LIBCAF_LIBRARIES} ${LD_FLAGS})
 add_dependencies(all_benchmarks caf_run_bench)
-add_custom_target(caf_scripts_dummy SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/run)
+add_custom_target(caf_scripts_dummy SOURCES "${SCRIPTS_DIR}/run")
 
 
 ################################################################################
@@ -341,8 +355,6 @@ add_custom_target(caf_scripts_dummy SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/scripts/
 ################################################################################
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/scripts/caf_run_benchmarks.in"
-               "${CMAKE_CURRENT_SOURCE_DIR}/scripts/caf_run_benchmarks"
-               @ONLY)
+               "${SCRIPTS_DIR}/caf_run_benchmarks" @ONLY)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/scripts/run.in"
-               "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run"
-               @ONLY)
+               "${SCRIPTS_DIR}/run" @ONLY)
