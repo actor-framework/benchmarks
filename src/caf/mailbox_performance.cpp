@@ -27,21 +27,26 @@
 using namespace std;
 using namespace caf;
 
+using msg_atom = atom_constant<atom("msg")>;
+
 class receiver : public event_based_actor {
  public:
-    receiver(uint64_t max) : m_max(max), m_value(0) {
-      // nop
-    }
-    virtual ~receiver();
-    behavior make_behavior() override {
-      return {
-        on(atom("msg")) >> [=] {
-          if (++m_value == m_max) {
-            quit();
-          }
+  receiver(uint64_t max) : m_max(max), m_value(0) {
+    // nop
+  }
+
+  virtual ~receiver();
+
+  behavior make_behavior() override {
+    return {
+      [=](msg_atom) {
+        if (++m_value == m_max) {
+          quit();
         }
-      };
-    }
+      }
+    };
+  }
+
  private:
   uint64_t m_max;
   uint64_t m_value;
@@ -53,24 +58,24 @@ receiver::~receiver() {
 
 void sender(actor whom, uint64_t count) {
   if (!whom) return;
-  auto msg = make_message(atom("msg"));
+  auto msg = make_message(msg_atom::value);
   for (uint64_t i = 0; i < count; ++i) {
-    anon_send_tuple(whom, msg);
+    anon_send(whom, msg);
   }
 }
 
 void usage() {
-    cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD"
-         << endl << endl;
-    exit(1);
+  cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD"
+       << endl << endl;
+  exit(1);
 }
 
 void run(uint64_t num_sender, uint64_t num_msgs) {
-    auto total = num_sender * num_msgs;
-    auto testee = spawn<receiver>(total);
-    for (uint64_t i = 0; i < num_sender; ++i) {
-        spawn(sender, testee, num_msgs);
-    }
+  auto total = num_sender * num_msgs;
+  auto testee = spawn<receiver>(total);
+  for (uint64_t i = 0; i < num_sender; ++i) {
+    spawn(sender, testee, num_msgs);
+  }
 }
 
 int main(int argc, char** argv) {

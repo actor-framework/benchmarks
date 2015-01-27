@@ -27,22 +27,30 @@
 using namespace std;
 using namespace caf;
 
-namespace { uint32_t s_num; }
+namespace {
+
+uint32_t s_num;
+
+using spread_atom = atom_constant<atom("spread")>;
+using result_atom = atom_constant<atom("result")>;
+
+} // namespace <anonymous>
 
 behavior testee(event_based_actor* self, actor parent) {
   return {
-    on(atom("spread"), uint32_t{1}) >> [=] {
-      self->send(parent, atom("result"), uint32_t{1});
-      self->quit();
-    },
-    on(atom("spread"), arg_match) >> [=](uint32_t x) {
-      auto msg = make_message(atom("spread"), x - 1);
-      self->send_tuple(self->spawn(testee, self), msg);
-      self->send_tuple(self->spawn(testee, self), msg);
+    [=](spread_atom, uint32_t x) {
+      if (x == 1) {
+        self->send(parent, result_atom::value, uint32_t{1});
+        self->quit();
+        return;
+      }
+      auto msg = make_message(spread_atom::value, x - 1);
+      self->send(self->spawn(testee, self), msg);
+      self->send(self->spawn(testee, self), msg);
       self->become (
-        on(atom("result"), arg_match) >> [=](uint32_t r1) {
+        [=](result_atom, uint32_t r1) {
           self->become (
-            on(atom("result"), arg_match) >> [=](uint32_t r2) {
+            [=](result_atom, uint32_t r2) {
               if (parent == invalid_actor) {
                 uint32_t res = 2 + r1 + r2;
                 uint32_t expected = (1 << s_num);
@@ -53,7 +61,7 @@ behavior testee(event_based_actor* self, actor parent) {
                   exit(42);
                 }
               } else {
-                self->send(parent, atom("result"), 1 + r1 + r2);
+                self->send(parent, result_atom::value, 1 + r1 + r2);
               }
               self->quit();
             }
@@ -78,10 +86,10 @@ int main(int argc, char** argv) {
     s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   }
   catch (std::exception&) {
-    cerr << "invalid argument: " << argv[1];
+    cerr << "invalid argument: " << argv[1] << endl;
     usage();
   }
-  anon_send(spawn(testee, invalid_actor), atom("spread"), s_num);
+  anon_send(spawn(testee, invalid_actor), spread_atom::value, s_num);
   await_all_actors_done();
   shutdown();
 }

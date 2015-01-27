@@ -22,6 +22,10 @@
 using namespace std;
 using namespace caf;
 
+using go_atom = atom_constant<atom("go")>;
+using poll_atom = atom_constant<atom("poll")>;
+using timeout_atom = atom_constant<atom("timeout")>;
+
 namespace { decltype(chrono::system_clock::now()) s_start; }
 
 #ifdef __APPLE__
@@ -70,13 +74,13 @@ bool print_rss(OutStream& out, string& line, const string& proc_file, pid_t) {
 void watchdog(blocking_actor* self, int max_runtime) {
   pid_t child;
   self->receive(
-    on(atom("go"), arg_match) >> [&](pid_t child_pid) {
+    [&](go_atom, pid_t child_pid) {
       child = child_pid;
     }
   );
-  self->delayed_send(self, chrono::seconds(max_runtime), atom("TimeIsUp"));
+  self->delayed_send(self, chrono::seconds(max_runtime), timeout_atom::value);
   self->receive(
-    on(atom("TimeIsUp")) >> [=] {
+    [=](timeout_atom) {
       kill(child, 9);
     }
   );
@@ -87,16 +91,17 @@ void memrecord(blocking_actor* self, int poll_interval, std::ostream& out) {
   string line_buf;
   pid_t child;
   self->receive(
-    on(atom("go"), arg_match) >> [&](pid_t child_pid) {
+    [&](go_atom, pid_t child_pid) {
       child = child_pid;
     }
   );
   fname += std::to_string(child);
   fname += "/status";
-  self->send(self, atom("poll"));
+  self->send(self, poll_atom::value);
   self->receive_loop(
-    on(atom("poll")) >> [&] {
-      self->delayed_send(self, chrono::milliseconds(poll_interval), atom("poll"));
+    [&](poll_atom) {
+      self->delayed_send(self, chrono::milliseconds(poll_interval),
+                         poll_atom::value);
       print_rss(out , line_buf, fname, child);
     }
   );
@@ -174,7 +179,7 @@ int main(int argc, char** argv) {
     // should be unreachable
     throw std::logic_error("execv failed");
   }
-  auto msg = make_message(atom("go"), child_pid);
+  auto msg = make_message(go_atom::value, child_pid);
   anon_send(dog, msg);
   anon_send(rec, msg);
   int child_exit_status = 0;

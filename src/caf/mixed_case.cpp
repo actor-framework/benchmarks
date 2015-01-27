@@ -30,11 +30,19 @@ using std::endl;
 
 using namespace caf;
 
-typedef std::vector<uint64_t> factors;
+namespace {
+
+using factors = std::vector<uint64_t>;
 
 constexpr uint64_t s_factor1 = 86028157;
 constexpr uint64_t s_factor2 = 329545133;
 constexpr uint64_t s_task_n = s_factor1 * s_factor2;
+
+using calc_atom = atom_constant<atom("calc")>;
+using done_atom = atom_constant<atom("done")>;
+using token_atom = atom_constant<atom("token")>;
+
+} // namespace <anonymous>
 
 factors factorize(uint64_t n) {
   factors result;
@@ -66,10 +74,10 @@ inline void check_factors(const factors& vec) {
 
 behavior worker(event_based_actor* self) {
   return {
-    on(atom("calc"), arg_match) >> [](uint64_t what) {
+    [](calc_atom, uint64_t what) {
       return factorize(what);
     },
-    on(atom("done")) >> [=] {
+    [=](done_atom) {
       self->quit();
     }
   };
@@ -77,7 +85,7 @@ behavior worker(event_based_actor* self) {
 
 behavior chain_link(event_based_actor* self, const actor& next) {
   return {
-    on(atom("token"), arg_match) >> [=](uint64_t value) {
+    [=](token_atom, uint64_t value) {
       if (value == 0) self->quit();
       self->forward_to(next);
     }
@@ -86,7 +94,7 @@ behavior chain_link(event_based_actor* self, const actor& next) {
 
 class chain_master : public event_based_actor {
  public:
-    chain_master(actor msgcollector, int rs, int itv, int n)
+    chain_master(actor msgcollector, int rs, uint64_t itv, int n)
       : m_iteration(0),
         m_ring_size(rs),
         m_initial_token_value(itv),
@@ -98,13 +106,13 @@ class chain_master : public event_based_actor {
     ~chain_master();
     behavior make_behavior() override {
       return {
-        on(atom("token"), arg_match) >> [=](uint64_t& value) {
+        [=](token_atom, uint64_t& value) {
           if (value == 0) {
             if (++m_iteration < m_num_iterations) {
               new_ring();
             } else {
-              send(m_factorizer, atom("done"));
-              send(m_mc, atom("masterdone"));
+              send(m_factorizer, done_atom::value);
+              send(m_mc, done_atom::value);
               quit();
             }
           } else {
@@ -114,18 +122,19 @@ class chain_master : public event_based_actor {
         }
       };
     }
+
  private:
   void new_ring() {
-    send_as(m_mc, m_factorizer, atom("calc"), s_task_n);
+    send_as(m_mc, m_factorizer, calc_atom::value, s_task_n);
     m_next = this;
     for (int i = 1; i < m_ring_size; ++i) {
       m_next = spawn(chain_link, m_next);
     }
-    send(m_next, atom("token"), static_cast<uint64_t>(m_initial_token_value));
+    send(m_next, token_atom::value, m_initial_token_value);
   }
   int m_iteration;
   int m_ring_size;
-  int m_initial_token_value;
+  uint64_t m_initial_token_value;
   int m_num_iterations;
   actor m_mc;
   actor m_next;
@@ -144,7 +153,7 @@ class supervisor : public event_based_actor{
   ~supervisor();
   behavior make_behavior() override {
     return {
-      on(atom("masterdone")) >> [=] {
+      [=](done_atom) {
         if (--m_left == 0) {
           quit();
         }
@@ -175,7 +184,7 @@ int main(int argc, char** argv) {
   announce<factors>("factors");
   int num_rings = atoi(argv[1]);
   int ring_size = atoi(argv[2]);
-  int initial_token_value = atoi(argv[3]);
+  auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
   int repetitions = atoi(argv[4]);
   auto sv = spawn<supervisor>(num_rings + (num_rings * repetitions));
   for (int i = 0; i < num_rings; ++i) {
