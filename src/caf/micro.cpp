@@ -95,13 +95,70 @@ mscount match_performance_builtin_only(size_t num) {
   return CAF_BENCH_DONE();
 }
 
+struct foo {
+  int a;
+  int b;
+};
+
+inline bool operator==(const foo& lhs, const foo& rhs) {
+  return lhs.a == rhs.a && lhs.b == rhs.b;
+}
+
+struct bar {
+  foo a;
+  std::string b;
+};
+
+inline bool operator==(const bar& lhs, const bar& rhs) {
+  return lhs.a == rhs.a && lhs.b == rhs.b;
+}
+
+mscount match_performance_with_userdefined_types(size_t num) {
+  std::vector<message> messages{make_message(foo{1, 2}),
+                                make_message(bar{foo{1, 2}, "hello"})};
+  size_t invoked = 0;
+  auto bhvr = behavior{
+    [&](int) {
+      invoked = 1;
+    },
+    [&](const foo&) {
+      invoked = 2;
+    },
+    [&](double) {
+      invoked = 3;
+    },
+    [&](const bar&) {
+      invoked = 4;
+    }
+  };
+  CAF_BENCH_START(message_creation, num);
+  for (size_t i = 0; i < num; ++i) {
+    for (size_t j = 0; j < messages.size(); ++j) {
+      invoked = 0;
+      bhvr(messages[j]);
+      if (invoked != (j + 1) * 2) {
+        cerr << "wrong handler called: expected " << ((j + 1) * 2)
+             << ", found " << invoked << endl;
+        return -1;
+      }
+    }
+  }
+  return CAF_BENCH_DONE();
+}
+
 int main() {
-  cout << "run message_creation bench(1M): 10x, ms" << endl;
+  cout << "message_creation bench(1M): 10x, ms" << endl;
   for (int i = 0; i < 10; ++i) {
     cout << message_creation(1000000) << endl;
   }
-  cout << "run match_performance_builtin_only bench(1M): 10x, ms" << endl;
+  cout << "match_performance_builtin_only bench(1M): 10x, ms" << endl;
   for (int i = 0; i < 10; ++i) {
     cout << match_performance_builtin_only(1000000) << endl;
+  }
+  announce<foo>("foo", &foo::a, &foo::b);
+  announce<bar>("bar", &bar::a, &bar::b);
+  cout << "match_performance_with_userdefined_types bench(1M): 10x, ms" << endl;
+  for (int i = 0; i < 10; ++i) {
+    cout << match_performance_with_userdefined_types(1000000) << endl;
   }
 }
