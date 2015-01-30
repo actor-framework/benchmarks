@@ -42,51 +42,44 @@ using mscount = int_least64_t;
   std::chrono::duration_cast<std::chrono::milliseconds>(                       \
     std::chrono::high_resolution_clock::now() - t1).count()
 
+namespace {
+
+constexpr size_t num_iterations_per_bench = 1000000;
+constexpr size_t num_bench_runs = 10;
+size_t s_invoked = 0;
+
+} // namespace <anonymous>
+
+template <class F, class... Ts>
+void run_bench(const char* name, const char* desc, F fun, Ts&&... args) {
+  cout << name << " [" << num_iterations_per_bench << " iterations, "
+       << num_bench_runs << " runs, msec] " << desc << endl;
+  for (size_t i = 0; i < num_bench_runs; ++i) {
+    cout << fun(std::forward<Ts>(args)...) << endl;
+  }
+}
+
 // returns nr. of ms
-mscount message_creation(size_t num) {
+mscount message_creation() {
   CAF_BENCH_START(message_creation, num);
   message msg = make_message(size_t{0});
-  for (size_t i = 0; i < num; ++i) {
+  for (size_t i = 0; i < num_iterations_per_bench; ++i) {
     msg = make_message(msg.get_as<size_t>(0) + 1);
   }
-  if (msg.get_as<size_t>(0) != num) {
+  if (msg.get_as<size_t>(0) != num_iterations_per_bench) {
     std::cerr << "wrong result, found " << msg.get_as<size_t>(0)
-              << ", expected " << num << std::endl;
+              << ", expected " << num_iterations_per_bench << std::endl;
   }
   return CAF_BENCH_DONE();
 }
 
-mscount match_performance_builtin_only(size_t num) {
-  std::vector<message> messages{make_message(1, 2),
-                                make_message(1.0, 2.0),
-                                make_message("hi", "there")};
-  size_t invoked = 0;
-  auto bhvr = behavior{
-    [&](int) {
-      invoked = 1;
-    },
-    [&](int, int) {
-      invoked = 2;
-    },
-    [&](double) {
-      invoked = 3;
-    },
-    [&](double, double) {
-      invoked = 4;
-    },
-    [&](const std::string&) {
-      invoked = 5;
-    },
-    [&](const std::string&, const std::string&) {
-      invoked = 6;
-    }
-  };
+mscount match_performance(behavior& bhvr, const std::vector<message>& mvec) {
   CAF_BENCH_START(message_creation, num);
-  for (size_t i = 0; i < num; ++i) {
-    for (size_t j = 0; j < messages.size(); ++j) {
-      invoked = 0;
-      bhvr(messages[j]);
-      if (invoked != (j + 1) * 2) {
+  for (size_t i = 0; i < num_iterations_per_bench; ++i) {
+    for (size_t j = 0; j < mvec.size(); ++j) {
+      s_invoked = 0;
+      bhvr(mvec[j]);
+      if (s_invoked != (j + 1) * 2) {
         cerr << "wrong handler called" << endl;
         return -1;
       }
@@ -113,52 +106,81 @@ inline bool operator==(const bar& lhs, const bar& rhs) {
   return lhs.a == rhs.a && lhs.b == rhs.b;
 }
 
-mscount match_performance_with_userdefined_types(size_t num) {
-  std::vector<message> messages{make_message(foo{1, 2}),
-                                make_message(bar{foo{1, 2}, "hello"})};
-  size_t invoked = 0;
-  auto bhvr = behavior{
+void run_match_bench_with_builtin_only() {
+  std::vector<message> v1{make_message(1, 2),
+                          make_message(1.0, 2.0),
+                          make_message("hi", "there")};
+  std::vector<message> v2;
+  message_builder mb;
+  v2.push_back(mb.append(1).append(2).to_message());
+  mb.clear();
+  v2.push_back(mb.append(1.0).append(2.0).to_message());
+  mb.clear();
+  v2.push_back(mb.append("hi").append("there").to_message());
+  mb.clear();
+  std::vector<std::vector<message>> messages_vec{std::move(v1), std::move(v2)};
+  behavior bhvr{
     [&](int) {
-      invoked = 1;
+      s_invoked = 1;
     },
-    [&](const foo&) {
-      invoked = 2;
+    [&](int, int) {
+      s_invoked = 2;
     },
     [&](double) {
-      invoked = 3;
+      s_invoked = 3;
     },
-    [&](const bar&) {
-      invoked = 4;
+    [&](double, double) {
+      s_invoked = 4;
+    },
+    [&](const std::string&) {
+      s_invoked = 5;
+    },
+    [&](const std::string&, const std::string&) {
+      s_invoked = 6;
     }
   };
-  CAF_BENCH_START(message_creation, num);
-  for (size_t i = 0; i < num; ++i) {
-    for (size_t j = 0; j < messages.size(); ++j) {
-      invoked = 0;
-      bhvr(messages[j]);
-      if (invoked != (j + 1) * 2) {
-        cerr << "wrong handler called: expected " << ((j + 1) * 2)
-             << ", found " << invoked << endl;
-        return -1;
-      }
-    }
+  std::vector<const char*> descs{"using make_message", "using message builder"};
+  for (size_t i = 0; i < 2; ++i) {
+    run_bench("match builtin types", descs[i],
+              match_performance, bhvr, messages_vec[i]);
   }
-  return CAF_BENCH_DONE();
+}
+
+void run_match_bench_with_userdefined_types() {
+  std::vector<message> v1{make_message(foo{1, 2}),
+                          make_message(bar{foo{1, 2}, "hello"})};
+  std::vector<message> v2;
+  message_builder mb;
+  v2.push_back(mb.append(foo{1, 2}).to_message());
+  mb.clear();
+  v2.push_back(mb.append(bar{foo{1, 2}, "hello"}).to_message());
+  mb.clear();
+  std::vector<std::vector<message>> messages_vec{std::move(v1), std::move(v2)};
+  behavior bhvr{
+    [&](int) {
+      s_invoked = 1;
+    },
+    [&](const foo&) {
+      s_invoked = 2;
+    },
+    [&](double) {
+      s_invoked = 3;
+    },
+    [&](const bar&) {
+      s_invoked = 4;
+    }
+  };
+  std::vector<const char*> descs{"using make_message", "using message builder"};
+  for (size_t i = 0; i < 2; ++i) {
+    run_bench("match user-defined types", descs[i],
+              match_performance, bhvr, messages_vec[i]);
+  }
 }
 
 int main() {
-  cout << "message_creation bench(1M): 10x, ms" << endl;
-  for (int i = 0; i < 10; ++i) {
-    cout << message_creation(1000000) << endl;
-  }
-  cout << "match_performance_builtin_only bench(1M): 10x, ms" << endl;
-  for (int i = 0; i < 10; ++i) {
-    cout << match_performance_builtin_only(1000000) << endl;
-  }
   announce<foo>("foo", &foo::a, &foo::b);
   announce<bar>("bar", &bar::a, &bar::b);
-  cout << "match_performance_with_userdefined_types bench(1M): 10x, ms" << endl;
-  for (int i = 0; i < 10; ++i) {
-    cout << match_performance_with_userdefined_types(1000000) << endl;
-  }
+  run_bench("message creation", "", message_creation);
+  run_match_bench_with_builtin_only();
+  run_match_bench_with_userdefined_types();
 }
