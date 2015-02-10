@@ -73,7 +73,7 @@ mscount message_creation() {
   return CAF_BENCH_DONE();
 }
 
-mscount match_performance(behavior& bhvr, const std::vector<message>& mvec) {
+mscount match_performance(behavior& bhvr, std::vector<message>& mvec) {
   CAF_BENCH_START(message_creation, num);
   for (size_t i = 0; i < num_iterations_per_bench; ++i) {
     for (size_t j = 0; j < mvec.size(); ++j) {
