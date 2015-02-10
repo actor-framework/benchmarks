@@ -60,8 +60,8 @@ void run_bench(const char* name, const char* desc, F fun, Ts&&... args) {
 }
 
 // returns nr. of ms
-mscount message_creation() {
-  CAF_BENCH_START(message_creation, num);
+mscount message_creation_native() {
+  CAF_BENCH_START(message_creation_native, num);
   message msg = make_message(size_t{0});
   for (size_t i = 0; i < num_iterations_per_bench; ++i) {
     msg = make_message(msg.get_as<size_t>(0) + 1);
@@ -73,8 +73,23 @@ mscount message_creation() {
   return CAF_BENCH_DONE();
 }
 
+mscount message_creation_dynamic() {
+  CAF_BENCH_START(message_creation_dynamic, num);
+  message_builder mb;
+  message msg = mb.append(size_t{0}).to_message();
+  for (size_t i = 0; i < num_iterations_per_bench; ++i) {
+    mb.clear();
+    msg = mb.append(msg.get_as<size_t>(0) + 1).to_message();
+  }
+  if (msg.get_as<size_t>(0) != num_iterations_per_bench) {
+    std::cerr << "wrong result, found " << msg.get_as<size_t>(0)
+              << ", expected " << num_iterations_per_bench << std::endl;
+  }
+  return CAF_BENCH_DONE();
+}
+
 mscount match_performance(behavior& bhvr, std::vector<message>& mvec) {
-  CAF_BENCH_START(message_creation, num);
+  CAF_BENCH_START(message_creation_native, num);
   for (size_t i = 0; i < num_iterations_per_bench; ++i) {
     for (size_t j = 0; j < mvec.size(); ++j) {
       s_invoked = 0;
@@ -180,7 +195,8 @@ void run_match_bench_with_userdefined_types() {
 int main() {
   announce<foo>("foo", &foo::a, &foo::b);
   announce<bar>("bar", &bar::a, &bar::b);
-  run_bench("message creation", "", message_creation);
+  run_bench("message creation (native)", "", message_creation_native);
+  run_bench("message creation (dynamic)", "", message_creation_dynamic);
   run_match_bench_with_builtin_only();
   run_match_bench_with_userdefined_types();
 }
