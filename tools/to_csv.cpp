@@ -49,9 +49,9 @@ struct statistics {
     }
     using namespace boost::math;
     mean = accumulate(data.begin(), data.end(), 0., plus<double>{})
-           / data.size();
+           / static_cast<double>(data.size());
     variance = accumulate(data.begin(), data.end(), 0., variance_plus{mean})
-               / data.size();
+               / static_cast<double>(data.size());
     std_dev = sqrt(variance);
     // calculate confidence interval
     students_t dist{static_cast<double>(data.size() - 1)};
@@ -301,10 +301,10 @@ class application {
     convert_mem_files(eor, last);
   }
 
-  vector<vector<double>> content(const string& file_name, size_t row_size) {
+  vector<vector<double>> content(const file_name& fname, size_t row_size) {
     vector<vector<double>> result;
     string line;
-    ifstream f{file_name};
+    ifstream f{fname};
     istream_iterator<double> eos; // end-of-stream iterator
     while (getline(f, line)) {
       vector<double> values;
@@ -320,7 +320,7 @@ class application {
     if (!result.empty() && all_of(result.begin(), result.end(), pred)) {
       return result;
     }
-    cerr << "*** invalid or empty file: " << file_name << endl;
+    cerr << "*** invalid or empty file: " << fname << endl;
     return {};
   }
 
