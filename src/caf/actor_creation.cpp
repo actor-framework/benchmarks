@@ -45,8 +45,8 @@ behavior testee(event_based_actor* self, actor parent) {
         return;
       }
       auto msg = make_message(spread_atom::value, x - 1);
-      self->send(self->spawn(testee, self), msg);
-      self->send(self->spawn(testee, self), msg);
+      self->send(self->spawn<lazy_init>(testee, self), msg);
+      self->send(self->spawn<lazy_init>(testee, self), msg);
       self->become (
         [=](result_atom, uint32_t r1) {
           self->become (
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     cerr << "invalid argument: " << argv[1] << endl;
     usage();
   }
-  anon_send(spawn(testee, invalid_actor), spread_atom::value, s_num);
+  anon_send(spawn<lazy_init>(testee, invalid_actor), spread_atom::value, s_num);
   await_all_actors_done();
   shutdown();
 }

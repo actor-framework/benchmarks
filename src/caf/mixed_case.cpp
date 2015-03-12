@@ -128,7 +128,7 @@ class chain_master : public event_based_actor {
     send_as(m_mc, m_factorizer, calc_atom::value, s_task_n);
     m_next = this;
     for (int i = 1; i < m_ring_size; ++i) {
-      m_next = spawn(chain_link, m_next);
+      m_next = spawn<lazy_init>(chain_link, m_next);
     }
     send(m_next, token_atom::value, m_initial_token_value);
   }
@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
   int ring_size = atoi(argv[2]);
   auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
   int repetitions = atoi(argv[4]);
-  auto sv = spawn<supervisor>(num_rings + (num_rings * repetitions));
+  auto sv = spawn<supervisor, lazy_init>(num_rings + (num_rings * repetitions));
   for (int i = 0; i < num_rings; ++i) {
     spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
   }
