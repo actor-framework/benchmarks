@@ -323,6 +323,9 @@ add_caf_benchmark(mailbox_performance)
 add_caf_benchmark(mixed_case)
 add_caf_benchmark(mandelbrot)
 add_caf_benchmark(micro)
+add_caf_benchmark(distributed)
+add_caf_benchmark(matrix)
+add_caf_benchmark(matching)
 set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
 
 

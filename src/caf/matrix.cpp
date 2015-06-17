@@ -1,32 +1,21 @@
-/******************************************************************************\
- *           ___        __                                                    *
- *          /\_ \    __/\ \                                                   *
- *          \//\ \  /\_\ \ \____    ___   _____   _____      __               *
- *            \ \ \ \/\ \ \ '__`\  /'___\/\ '__`\/\ '__`\  /'__`\             *
- *             \_\ \_\ \ \ \ \L\ \/\ \__/\ \ \L\ \ \ \L\ \/\ \L\.\_           *
- *             /\____\\ \_\ \_,__/\ \____\\ \ ,__/\ \ ,__/\ \__/.\_\          *
- *             \/____/ \/_/\/___/  \/____/ \ \ \/  \ \ \/  \/__/\/_/          *
- *                                          \ \_\   \ \_\                     *
- *                                           \/_/    \/_/                     *
+/******************************************************************************
+ *                       ____    _    _____                                   *
+ *                      / ___|  / \  |  ___|    C++                           *
+ *                     | |     / _ \ | |_       Actor                         *
+ *                     | |___ / ___ \|  _|      Framework                     *
+ *                      \____/_/   \_|_|                                      *
  *                                                                            *
- * Copyright (C) 2011-2013                                                    *
- * Dominik Charousset <dominik.charousset@haw-hamburg.de>                     *
+ * Copyright (C) 2011 - 2015                                                  *
+ * Dominik Charousset <dominik.charousset (at) haw-hamburg.de>                *
  *                                                                            *
- * This file is part of libcppa.                                              *
- * libcppa is free software: you can redistribute it and/or modify it under   *
- * the terms of the GNU Lesser General Public License as published by the     *
- * Free Software Foundation, either version 3 of the License                  *
- * or (at your option) any later version.                                     *
+ * Distributed under the terms and conditions of the BSD 3-Clause License or  *
+ * (at your option) under the terms and conditions of the Boost Software      *
+ * License 1.0. See accompanying files LICENSE and LICENSE_ALTERNATIVE.       *
  *                                                                            *
- * libcppa is distributed in the hope that it will be useful,                 *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                       *
- * See the GNU Lesser General Public License for more details.                *
- *                                                                            *
- * You should have received a copy of the GNU Lesser General Public License   *
- * along with libcppa. If not, see <http://www.gnu.org/licenses/>.            *
-\******************************************************************************/
-
+ * If you did not receive a copy of the license files, see                    *
+ * http://opensource.org/licenses/BSD-3-Clause and                            *
+ * http://www.boost.org/LICENSE_1_0.txt.                                      *
+ ******************************************************************************/
 
 #include <array>
 #include <vector>
@@ -34,14 +23,14 @@
 #include <numeric>
 #include <iostream>
 
-#include "backward_compatibility.hpp"
+#include "caf/all.hpp"
 
 #ifdef ENABLE_OPENCL
-#include "cppa/opencl.hpp"
+#include "caf/opencl/all.hpp"
 #endif
 
 using namespace std;
-using namespace cppa;
+using namespace caf;
 
 static constexpr size_t matrix_size = 1000;
 
@@ -218,30 +207,25 @@ matrix_type opencl_multiply(const matrix_type&, const matrix_type&) {
 #endif
 
 int main(int argc, char** argv) {
-
-    announce<vector<int>>();
-    announce<vector<float>>();
-    announce<matrix_type>();
-
-    if (argc != 2) {
-        cerr << "usage: " << argv[0] << " --(simple|actor|async|opencl)" << endl;
-        return -1;
-    }
-
-    matrix_type a;
-    a.iota_fill();
-    matrix_type b;
-    b.iota_fill();
-
-    match(make_any_tuple(argv[1], std::move(a), std::move(b))) (
-        on("--simple", arg_match) >> simple_multiply,
-        on("--actor", arg_match) >> actor_multiply,
-        on("--actor2", arg_match) >> actor_multiply2,
-        on("--async", arg_match) >> async_multiply,
-        on("--async2", arg_match) >> async_multiply2,
-        on("--opencl", arg_match) >> opencl_multiply,
-        others() >> [] { cerr << "invalid arguments" << endl; }
-    );
-
-    return 0;
+  announce<vector<int>>("std::vector<int>");
+  announce<vector<float>>("std::vector<float>");
+  announce<matrix_type>("matrix_type");
+  if (argc != 2) {
+    cerr << "usage: " << argv[0] << " --(simple|actor|async|opencl)" << endl;
+    return -1;
+  }
+  matrix_type a;
+  a.iota_fill();
+  matrix_type b;
+  b.iota_fill();
+  message_builder mb;
+  mb.append(argv[1]).append(std::move(a)).append(std::move(b)).apply({
+    on("--simple", arg_match) >> simple_multiply,
+    on("--actor", arg_match) >> actor_multiply,
+    on("--actor2", arg_match) >> actor_multiply2,
+    on("--async", arg_match) >> async_multiply,
+    on("--async2", arg_match) >> async_multiply2,
+    on("--opencl", arg_match) >> opencl_multiply,
+    others >> [] { cerr << "invalid arguments" << endl; }
+  });
 }
