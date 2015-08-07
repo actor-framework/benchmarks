@@ -41,9 +41,7 @@ using hrc = high_resolution_clock;
 using timestamp = decltype(hrc::now());
 
 behavior task_worker(event_based_actor* self) {
-  actor_ostream::redirect(self, "task_worker_" + std::to_string(self->id()));
-  aout(self) << self->id() << " " << "task_worker" << endl;
-  aout(self) << "hi there from " << self->id() << "! :)" << endl;
+  aout(self) << self->id() << " task_worker_" << self->id() << endl;
   return {
     [=](task_atom, int complexity, timestamp ts) -> int {
       //aout(self) << "delay until received: " << ms(ts, hrc::now()) << endl;
@@ -98,7 +96,7 @@ bool mandatory_missing(std::set<std::string> opts,
   return std::any_of(xs.begin(), xs.end(), not_in_opts);
 }
 
-bool setup(int argc, char** argv) {
+bool setup(int argc, char** argv, int& workload) {
   std::string profiler_output_file;
   std::string labels_output_file;
   long long profiler_resolution_ms = 100;
@@ -109,11 +107,12 @@ bool setup(int argc, char** argv) {
     {"labels,l", "output file for labels (mandatory)", labels_output_file},
     {"resolution,r", "profiler resolution in ms", profiler_resolution_ms},
     {"threads,t", "number of threads for the scheduler", scheduler_threads},
-    {"max-msgs,m", "number of messages per actor run", max_msg_per_run}
+    {"max-msgs,m", "number of messages per actor run", max_msg_per_run},
+    {"workload,w", "select workload to bench (1-10) (mandatory)", workload}
   });
   if (! res.error.empty() || res.opts.count("help") > 0
       || ! res.remainder.empty()
-      || mandatory_missing(res.opts, {"output", "labels"})) {
+      || mandatory_missing(res.opts, {"output", "labels", "workload"})) {
     cout << res.error << endl << res.helptext << endl;
     return false;
   }
@@ -125,10 +124,9 @@ bool setup(int argc, char** argv) {
   return true;
 }
 
-int main(int argc, char** argv) {
-  if (! setup(argc, argv)) {
-    return 1;
-  }
+/// Spawn 20 `task_worker` and give them work,
+/// the work has variation in its complexity (0 to 4)
+void workload_1() {
   vector<actor> workers;
   for (int i = 0; i < 20; ++i) {
     workers.push_back(spawn<lazy_init>(task_worker));
@@ -142,6 +140,122 @@ int main(int argc, char** argv) {
   }
   for (auto& w : workers) {
     anon_send_exit(w, exit_reason::user_shutdown);
+  }
+}
+
+/// Spawn 2^15 `recursive_worker`
+void workload_2() {
+  auto root = spawn(recursive_worker, invalid_actor);
+  anon_send(root, task_atom::value, uint32_t{15});
+}
+
+/// Spawn 20 `task_worker`and give them work,
+/// the work has variation in its complexity (0 to 4)
+/// In addition, this will spawn 2^15 `recursive_worker`
+void workload_3() {
+  vector<actor> workers;
+  for (int i = 0; i < 20; ++i) {
+    workers.push_back(spawn<lazy_init>(task_worker));
+  }
+  for (int j = 0; j < 10; ++j) {
+    for (int i = 0; i < 5; ++i) {
+      for (auto& w : workers) {
+        anon_send(w, task_atom::value, i, hrc::now());
+      }
+    }
+  }
+  auto root = spawn(recursive_worker, invalid_actor);
+  anon_send(root, task_atom::value, uint32_t{15});
+  for (auto& w : workers) {
+    anon_send_exit(w, exit_reason::user_shutdown);
+  }
+  anon_send_exit(root, exit_reason::user_shutdown);
+}
+
+/// Spawn 5 `task_worker` and give them work
+/// then spawn 2^15 `recursive_worker`. This is
+/// repeated 10 times.
+void workload_4() {
+  vector<actor> workers;
+  for (int j = 0; j < 10; ++j) {
+    for (int i = 0; i < 5; ++i) {
+      for (auto& w : workers) {
+        anon_send(w, task_atom::value, i, hrc::now());
+      }
+    }
+    auto root = spawn(recursive_worker, invalid_actor);
+    anon_send(root, task_atom::value, uint32_t{15});
+    for (int i = 0; i < 5; ++i) {
+      workers.push_back(spawn<lazy_init>(task_worker));
+    }
+    anon_send_exit(root, exit_reason::user_shutdown);
+  }
+  for (auto& w : workers) {
+    anon_send_exit(w, exit_reason::user_shutdown);
+  }
+}
+
+/// Spawn 5 `recursive_worker` in an actor pool
+/// after that, 5 `task_worker` are spawnend in an actor pool
+void workload_5() {
+  auto factory = [] {
+    return spawn(recursive_worker, invalid_actor);
+  };
+  auto pool = actor_pool::make(5, factory, actor_pool::broadcast());
+  anon_send(pool, task_atom::value, uint32_t{15});
+  auto factory_task = [] {
+    return spawn(task_worker);
+  };
+  auto pool2 = actor_pool::make(5, factory_task, actor_pool::broadcast());
+  for (int j = 0; j < 10; ++j) {
+    for (int i = 0; i < 9; ++i) {
+      anon_send(pool2, task_atom::value, i, hrc::now());
+    }
+  }
+  anon_send_exit(pool2, exit_reason::user_shutdown);
+}
+
+/// Spawn either 2^15 `recursive_worker` or a actor pool with 10 actors
+/// of `task_worker` type. This is repeated 20 times, on every even count this
+/// workload will spawn `recursive_worker`, on odd count `task_worker`.
+void workload_6() {
+  for (int i = 0; i < 20; ++i) {
+    if (i % 2) {
+      auto root = spawn(recursive_worker, invalid_actor);
+      anon_send(root, task_atom::value, uint32_t{15});
+    } else {
+      auto pool = actor_pool::make(10, []{ return spawn(task_worker); },
+                                   actor_pool::broadcast());
+      anon_send(pool, task_atom::value, i, hrc::now());
+      anon_send_exit(pool, exit_reason::user_shutdown);
+    }
+  }
+}
+
+int main(int argc, char** argv) {
+  int workload = 0;
+  if (! setup(argc, argv, workload)) {
+    return 1;
+  }
+  switch(workload) {
+    case 1:
+      workload_1();
+      break;
+    case 2:
+      workload_2();
+      break;
+    case 3:
+      workload_3();
+      break;
+    case 4:
+      workload_4();
+      break;
+    case 5:
+      workload_5();
+      break;
+    case 6:
+      workload_6();
+      break;
   }
   await_all_actors_done();
   shutdown();
