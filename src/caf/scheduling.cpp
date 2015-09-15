@@ -43,7 +43,7 @@ using timestamp = decltype(hrc::now());
 behavior task_worker(event_based_actor* self) {
   aout(self) << self->id() << " task_worker_" << self->id() << endl;
   return {
-    [=](task_atom, int complexity, timestamp ts) -> int {
+    [=](task_atom, int complexity, timestamp) -> int {
       //aout(self) << "delay until received: " << ms(ts, hrc::now()) << endl;
       int result = 0;
       auto x = uint64_t{1} << complexity;

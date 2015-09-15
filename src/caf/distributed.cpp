@@ -27,6 +27,8 @@
 using namespace std;
 using namespace caf;
 
+namespace {
+
 void usage() {
     cout << "Running in server mode:"                                    << endl
          << "  mode=server  "                                            << endl
@@ -69,8 +71,8 @@ public:
             send(parent_, atom("done"));
             quit();
           },
-          on(atom("pong"), arg_match) >> [=](uint32_t value) {
-            return make_tuple(atom("ping"), value - 1);
+          on(atom("pong"), arg_match) >> [=](uint32_t x) {
+            return make_tuple(atom("ping"), x - 1);
           },
           others >> [=] {
             cout << "ping_actor: unexpected: "
@@ -173,7 +175,7 @@ void server_mode(Iterator first, Iterator last) {
   message_builder{first, last}.apply({
     (on(kvp_port) || on("-p", spro<int>)) >> [](int port) {
       if (port > 1024 && port < 65536)
-        io::publish(spawn<server_actor>(), port);
+        io::publish(spawn<server_actor>(), static_cast<uint16_t>(port));
       else
         usage("illegal port: ", port);
     },
@@ -330,6 +332,8 @@ void shutdown_mode(Iterator first, Iterator last) {
     }
   }
 }
+
+} // namespace <anonymous>
 
 int main(int argc, char** argv) {
     if (argc < 2) usage();
