@@ -314,7 +314,7 @@ endif()
 # add targets for CAF benchmarks
 macro(add_caf_benchmark name)
   add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/${name}.cpp)
-  target_link_libraries(${name} ${LIBCAF_LIBRARIES} ${LD_FLAGS})
+  target_link_libraries(${name} ${CAF_LIBRARIES} ${LD_FLAGS})
   add_dependencies(all_benchmarks ${name})
 endmacro()
 
@@ -349,7 +349,7 @@ if(Boost_FOUND)
   target_link_libraries(to_csv ${LD_FLAGS})
 endif()
 add_executable(caf_run_bench "${TOOLS_DIR}/caf_run_bench.cpp")
-target_link_libraries(caf_run_bench ${LIBCAF_LIBRARIES} ${LD_FLAGS})
+target_link_libraries(caf_run_bench ${CAF_LIBRARIES} ${LD_FLAGS})
 add_dependencies(all_benchmarks caf_run_bench)
 add_custom_target(caf_scripts_dummy SOURCES "${SCRIPTS_DIR}/run")
 
