@@ -13,6 +13,7 @@
 
 // for CAF_PUSH_WARNINGS
 #include "caf/config.hpp"
+#include "caf/string_algorithms.hpp"
 
 CAF_PUSH_WARNINGS
 #include <boost/math/distributions/students_t.hpp>
@@ -96,14 +97,81 @@ constexpr char yerr_suffix[] = "_yerr";
 
 constexpr int yerr_suffix_size = 5;
 
-constexpr char file_name_format[] = "([0-9]+)_(cores|machines)_"
-                                    "(runtime|memory_[0-9]+)_"
-                                    "([a-zA-Z]+)_"
-                                    "([a-zA-Z_]+)\\.txt";
+constexpr char file_name_default_format[] =
+    "{X-VALUE}_{X-LABEL}_{MEMORY_OR_RUNTIME}_{LABEL}_{BENCHMARK}\\.txt";
+
+constexpr size_t num_field_names = 5;
+
+constexpr const char* field_names [num_field_names] = {
+  "X-VALUE",
+  "X-LABEL",
+  "MEMORY_OR_RUNTIME",
+  "LABEL",
+  "BENCHMARK"
+};
+
+void print_help(int exit_code) {
+  cout << "to_csv [-f FORMAT] FILES..." << endl
+       << "default format string: " << file_name_default_format << endl;
+  exit(exit_code);
+}
+
+using cstr_iterator = const char*;
+
+int index_of(const char* cstr,
+             const vector<std::pair<cstr_iterator, cstr_iterator>>& vec) {
+  for (int i = 0; i < static_cast<int>(vec.size()); ++i) {
+    auto x = vec[i];
+    if (distance(x.first, x.second) == strlen(cstr)
+        && equal(x.first, x.second, cstr))
+      return i;
+  }
+  return -1;
+}
+
+pair<regex, map<string, int>> read_format(const char* format_str) {
+  using iterator = const char*;
+  map<string, int> mapping;
+  auto first = format_str;
+  auto last = first + strlen(format_str);
+  vector<std::pair<cstr_iterator, cstr_iterator>> vars;
+  // collect all variables with syntax "{...}"
+  auto i = find(first, last, '{');
+  auto e = find(i, last, '}');
+  while (i != e && e != last) {
+    vars.push_back(make_pair(i + 1, e));
+    i = find(e, last, '{');
+    e = find(i, last, '}');
+  }
+  if (vars.size() != num_field_names) {
+    cerr << "expected " << num_field_names << " field names, found "
+         << vars.size() << endl;
+    print_help(1);
+  }
+  for (auto fn : field_names) {
+    // get index for this field
+    auto ix = index_of(fn, vars);
+    if (ix == -1) {
+      cerr << "field missing: " << fn << endl;
+      print_help(1);
+    }
+    mapping.emplace(fn, ix + 1);
+  }
+  // replace all field names in format string
+  using caf::replace_all;
+  std::string fstr = format_str;
+  replace_all(fstr, "{X-VALUE}", "([0-9]+)");
+  replace_all(fstr, "{X-LABEL}", "([a-zA-Z_]+)");
+  replace_all(fstr, "{MEMORY_OR_RUNTIME}", "(runtime|memory_[0-9]+)");
+  replace_all(fstr, "{LABEL}", "([a-zA-Z]+)");
+  replace_all(fstr, "{BENCHMARK}", "([a-zA-Z_]+)");
+  regex rx{fstr};
+  return make_pair(std::move(rx), std::move(mapping));
+}
 
 class application {
  public:
-  application()
+  application(pair<regex, map<string, int>> field_conf)
       : m_nice_names{{"caf",     "CAF"},
                      {"scala",   "Scala"},
                      {"salsa",   "SalsaLite"},
@@ -113,7 +181,8 @@ class application {
                      {"foundry", "ActorFoundry"},
                      {"erlang",  "Erlang"},
                      {"mpi",     "MPI"}},
-        m_fname_rx{file_name_format},
+        m_fname_rx{std::move(field_conf.first)},
+        m_fname_field_ids{std::move(field_conf.second)},
         m_field_width{0} {
     for (auto& nn : m_nice_names) {
       m_field_width = max(m_field_width, static_cast<int>(nn.second.size())
@@ -128,16 +197,16 @@ class application {
       benchmark_file res;
       smatch rxres;
       if (regex_match(fname, rxres, m_fname_rx) && rxres.size() == 6) {
-        res.num_units = static_cast<size_t>(stoi(rxres.str(1)));
-        m_unit_name = rxres.str(2);
-        res.type = rxres.str(3) == "runtime" ? runtime_values : memory_values;
-        res.framework = rxres.str(4);
-        res.benchmark_name = rxres.str(5);
+        res.num_units = static_cast<size_t>(stoi(rxres.str(m_fname_field_ids["X-VALUE"])));
+        m_unit_name = rxres.str(m_fname_field_ids["X-LABEL"]);
+        res.type = rxres.str(m_fname_field_ids["MEMORY_OR_RUNTIME"]) == "runtime" ? runtime_values : memory_values;
+        res.framework = rxres.str(m_fname_field_ids["LABEL"]);
+        res.benchmark_name = rxres.str(m_fname_field_ids["BENCHMARK"]);
         res.path = std::move(fname);
       } else {
         res.type = invalid_file;
         cerr << "*** file name \"" << fname
-             << "\" does not match regex \"" << file_name_format << "\"" << endl;
+             << "\" does not match regex" << endl;
       }
       return res;
     };
@@ -326,6 +395,7 @@ class application {
 
   map<string, string> m_nice_names;
   regex m_fname_rx;
+  map<string, int> m_fname_field_ids;
   vector<string> m_benchmarks;
   int m_field_width;
   string m_empty_field;
@@ -333,6 +403,14 @@ class application {
 };
 
 int main(int argc, char** argv) {
-  application app;
-  app.run({argv + 1, argv + argc});
+  int offset = 0;
+  pair<regex, map<string, int>> format_config;
+  if (argc >= 3 && strcmp(argv[1], "-f") == 0) {
+    offset = 2;
+    format_config = read_format(argv[2]);
+  } else {
+    format_config = read_format(file_name_default_format);
+  }
+  application app{std::move(format_config)};
+  app.run({argv + 1 + offset, argv + argc});
 }
