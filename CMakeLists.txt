@@ -26,6 +26,18 @@ macro(add_xxx_benchmark benchname dir name src_ending bin_ending out_path)
                      VERBATIM)
 endmacro()
 
+# make files show up in GUI even if not building a particular benchmark
+macro(add_dummy_target benchname src_ending)
+  # check all aditional dependency flags
+  set(globstr "${CMAKE_CURRENT_SOURCE_DIR}/src/${benchname}/*.${src_ending}")
+  foreach(additional_ending ${ARGN})
+    set(globstr ${globstr}
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/${benchname}/*.${additional_ending}")
+  endforeach()
+  file(GLOB_RECURSE source_files ${globstr})
+  add_custom_target(caf_${benchname}_dummy SOURCES ${source_files})
+endmacro()
+
 
 ################################################################################
 #                                    Scala                                     #
@@ -71,7 +83,7 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
   add_dependencies(all_benchmarks scala_benchmarks)
   set(CAF_COMPILED_BENCHES "scala ${CAF_COMPILED_BENCHES}")
 else()
-  set(CAF_SCALA_COMPILER "")
+  add_dummy_target(scala scala)
 endif()
 
 
@@ -201,6 +213,8 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
                             ${MANDELBROT_CLASS_FILES})
   add_dependencies(all_benchmarks salsa_benchmarks)
   set(CAF_COMPILED_BENCHES "salsa ${CAF_COMPILED_BENCHES}")
+else()
+  add_dummy_target(salsa salsa)
 endif()
 
 
@@ -239,7 +253,7 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
   add_dependencies(all_benchmarks erlang_benchmarks)
   set(CAF_COMPILED_BENCHES "erlang ${CAF_COMPILED_BENCHES}")
 else()
-  set(CAF_ERLANG_COMPILER "")
+  add_dummy_target(erlang erl)
 endif()
 
 
@@ -298,12 +312,7 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
   add_dependencies(all_benchmarks charm_benchmarks)
   set(CAF_COMPILED_BENCHES "charm ${CAF_COMPILED_BENCHES}")
 else()
-  # make files show up in GUI even if not building Charm++
-  file(GLOB_RECURSE CHARM_SOURCES
-       "${CMAKE_CURRENT_SOURCE_DIR}/charm++/*.cpp"
-       "${CMAKE_CURRENT_SOURCE_DIR}/charm++/*.ci")
-  add_custom_target(caf_charm_bench_dummy SOURCES ${MISC_FILES})
-  set(CAF_CHARM_COMPILER "")
+  add_dummy_target(charm cpp ci)
 endif()
 
 
