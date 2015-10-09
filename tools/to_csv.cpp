@@ -120,18 +120,17 @@ using cstr_iterator = const char*;
 
 int index_of(const char* cstr,
              const vector<std::pair<cstr_iterator, cstr_iterator>>& vec) {
-  for (int i = 0; i < static_cast<int>(vec.size()); ++i) {
+  for (size_t i = 0; i < vec.size(); ++i) {
     auto x = vec[i];
-    if (distance(x.first, x.second) == strlen(cstr)
+    if (distance(x.first, x.second) == static_cast<ptrdiff_t>(strlen(cstr))
         && equal(x.first, x.second, cstr))
-      return i;
+      return static_cast<int>(i);
   }
   return -1;
 }
 
-pair<regex, map<string, int>> read_format(const char* format_str) {
-  using iterator = const char*;
-  map<string, int> mapping;
+pair<regex, map<string, size_t>> read_format(const char* format_str) {
+  map<string, size_t> mapping;
   auto first = format_str;
   auto last = first + strlen(format_str);
   vector<std::pair<cstr_iterator, cstr_iterator>> vars;
@@ -171,7 +170,7 @@ pair<regex, map<string, int>> read_format(const char* format_str) {
 
 class application {
  public:
-  application(pair<regex, map<string, int>> field_conf)
+  application(pair<regex, map<string, size_t>> field_conf)
       : m_nice_names{{"caf",     "CAF"},
                      {"scala",   "Scala"},
                      {"salsa",   "SalsaLite"},
@@ -182,7 +181,7 @@ class application {
                      {"erlang",  "Erlang"},
                      {"mpi",     "MPI"}},
         m_fname_rx{std::move(field_conf.first)},
-        m_fname_field_ids{std::move(field_conf.second)},
+        m_fname_ids{std::move(field_conf.second)},
         m_field_width{0} {
     for (auto& nn : m_nice_names) {
       m_field_width = max(m_field_width, static_cast<int>(nn.second.size())
@@ -197,11 +196,13 @@ class application {
       benchmark_file res;
       smatch rxres;
       if (regex_match(fname, rxres, m_fname_rx) && rxres.size() == 6) {
-        res.num_units = static_cast<size_t>(stoi(rxres.str(m_fname_field_ids["X-VALUE"])));
-        m_unit_name = rxres.str(m_fname_field_ids["X-LABEL"]);
-        res.type = rxres.str(m_fname_field_ids["MEMORY_OR_RUNTIME"]) == "runtime" ? runtime_values : memory_values;
-        res.framework = rxres.str(m_fname_field_ids["LABEL"]);
-        res.benchmark_name = rxres.str(m_fname_field_ids["BENCHMARK"]);
+        res.num_units = stoul(rxres.str(m_fname_ids["X-VALUE"]));
+        m_unit_name = rxres.str(m_fname_ids["X-LABEL"]);
+        res.type = rxres.str(m_fname_ids["MEMORY_OR_RUNTIME"]) == "runtime"
+                             ? runtime_values
+                             : memory_values;
+        res.framework = rxres.str(m_fname_ids["LABEL"]);
+        res.benchmark_name = rxres.str(m_fname_ids["BENCHMARK"]);
         res.path = std::move(fname);
       } else {
         res.type = invalid_file;
@@ -395,7 +396,7 @@ class application {
 
   map<string, string> m_nice_names;
   regex m_fname_rx;
-  map<string, int> m_fname_field_ids;
+  map<string, size_t> m_fname_ids;
   vector<string> m_benchmarks;
   int m_field_width;
   string m_empty_field;
@@ -404,7 +405,7 @@ class application {
 
 int main(int argc, char** argv) {
   int offset = 0;
-  pair<regex, map<string, int>> format_config;
+  pair<regex, map<string, size_t>> format_config;
   if (argc >= 3 && strcmp(argv[1], "-f") == 0) {
     offset = 2;
     format_config = read_format(argv[2]);
