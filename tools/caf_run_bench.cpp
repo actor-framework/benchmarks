@@ -86,7 +86,8 @@ void watchdog(blocking_actor* self, int max_runtime) {
   );
 }
 
-void memrecord(blocking_actor* self, int poll_interval, std::ostream& out) {
+void memrecord(blocking_actor* self, int poll_interval, std::ostream* out_ptr) {
+  auto& out = *out_ptr;
   string fname = "/proc/";
   string line_buf;
   pid_t child;
@@ -148,7 +149,7 @@ int main(int argc, char** argv) {
   // start background workers
   auto dog = spawn<detached + blocking_api>(watchdog, max_runtime);
   auto rec = spawn<detached + blocking_api>(memrecord, poll_interval,
-                                            std::ref(mem_out_buf));
+                                            &mem_out_buf);
   cout << "fork into " << argv[6] << endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
