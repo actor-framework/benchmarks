@@ -166,7 +166,7 @@ template<typename Iterator>
 void server_mode(Iterator first, Iterator last) {
   string port_prefix = "--port=";
   // extracts port from a key-value pair
-  auto kvp_port = [&](const string& str) -> optional<int> {
+  auto kvp_port = [&](const string& str) -> maybe<int> {
     if (equal(port_prefix.begin(), port_prefix.end(), str.begin())) {
       return spro<int>(str.c_str() + port_prefix.size());
     }
@@ -193,7 +193,7 @@ void client_mode(Iterator first, Iterator last) {
   uint32_t init_value = 0;
   vector<pair<string, uint16_t> > remotes;
   string pings_prefix = "--num_pings=";
-  auto num_msgs = [&](const string& str) -> optional<int> {
+  auto num_msgs = [&](const string& str) -> maybe<int> {
     if (equal(pings_prefix.begin(), pings_prefix.end(), str.begin())) {
       return spro<int>(str.c_str() + pings_prefix.size());
     }
