@@ -193,8 +193,6 @@ void run_match_bench_with_userdefined_types() {
 }
 
 int main() {
-  announce<foo>("foo", &foo::a, &foo::b);
-  announce<bar>("bar", &bar::a, &bar::b);
   run_bench("message creation (native)", "", message_creation_native);
   run_bench("message creation (dynamic)", "", message_creation_dynamic);
   run_match_bench_with_builtin_only();

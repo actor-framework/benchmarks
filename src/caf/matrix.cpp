@@ -34,139 +34,150 @@ using namespace caf;
 
 static constexpr size_t matrix_size = 1000;
 
-template<size_t Size>
+template <size_t Size>
 class square_matrix {
+public:
+  static constexpr size_t num_elements = Size * Size;
 
- public:
+  square_matrix(square_matrix&&) = default;
+  square_matrix(const square_matrix&) = default;
+  square_matrix& operator=(square_matrix&&) = default;
+  square_matrix& operator=(const square_matrix&) = default;
 
-    static constexpr size_t num_elements = Size * Size;
+  square_matrix() {
+    data_.resize(num_elements);
+  }
 
-    square_matrix(square_matrix&&) = default;
-    square_matrix(const square_matrix&) = default;
-    square_matrix& operator=(square_matrix&&) = default;
-    square_matrix& operator=(const square_matrix&) = default;
+  square_matrix(vector<float> d) : data_(std::move(d)) {
+    // nop
+  }
 
-    square_matrix() {
-        m_data.resize(num_elements);
-    }
+  square_matrix(const std::initializer_list<float>& args) : data_(args) {
+    data_.resize(num_elements);
+  }
 
-    square_matrix(vector<float> d) : m_data(std::move(d)) { }
+  inline float& operator()(size_t row, size_t column) {
+    return data_[row * Size + column];
+  }
 
-    square_matrix(const std::initializer_list<float>& args) : m_data(args) {
-        m_data.resize(num_elements);
-    }
+  inline const float& operator()(size_t row, size_t column) const {
+    return data_[row * Size + column];
+  }
 
-    inline float& operator()(size_t row, size_t column) {
-        return m_data[row * Size + column];
-    }
+  inline void zeroize() {
+    std::fill(data_.begin(), data_.end(), 0);
+  }
 
-    inline const float& operator()(size_t row, size_t column) const {
-        return m_data[row * Size + column];
-    }
+  inline void iota_fill() {
+    std::iota(data_.begin(), data_.end(), 0);
+  }
 
-    inline void zeroize() {
-        std::fill(m_data.begin(), m_data.end(), 0);
-    }
+  typedef typename vector<float>::const_iterator const_iterator;
 
-    inline void iota_fill() {
-        std::iota(m_data.begin(), m_data.end(), 0);
-    }
+  const_iterator begin() const {
+    return data_.begin();
+  }
 
-    typedef typename vector<float>::const_iterator const_iterator;
+  const_iterator end() const {
+    return data_.end();
+  }
 
-    const_iterator begin() const { return m_data.begin(); }
+  vector<float>& data() {
+    return data_;
+  }
 
-    const_iterator end() const { return m_data.end(); }
+  const vector<float>& data() const {
+    return data_;
+  }
 
-    vector<float>& data() { return m_data; }
+  template <class T>
+  friend void serialize(T& in_or_out, square_matrix& x, const unsigned int) {
+    in_or_out & x.data_;
+  }
 
-    const vector<float>& data() const { return m_data; }
-
- private:
-
-    vector<float> m_data;
-
+private:
+  vector<float> data_;
 };
 
 template<size_t Size>
-inline bool operator==(const square_matrix<Size>& lhs, const square_matrix<Size>& rhs) {
-    return std::equal(lhs.begin(), lhs.end(), rhs.begin());
+inline bool operator==(const square_matrix<Size>& x, const square_matrix<Size>& y) {
+    return std::equal(x.begin(), x.end(), y.begin());
 }
 
 template<size_t Size>
-inline bool operator!=(const square_matrix<Size>& lhs, const square_matrix<Size>& rhs) {
-    return !(lhs == rhs);
+inline bool operator!=(const square_matrix<Size>& x, const square_matrix<Size>& y) {
+    return !(x == y);
 }
 
 using matrix_type = square_matrix<matrix_size>;
 
-float dot_product(const matrix_type& lhs, const matrix_type& rhs, size_t row, size_t column) {
+float dot_product(const matrix_type& x, const matrix_type& y, size_t row, size_t column) {
     float result = 0.0f;
     for (size_t k = 0; k < matrix_size; ++k) {
-        result += lhs(row, k) * rhs(k, column);
+        result += x(row, k) * y(k, column);
     }
     return result;
 }
 
-matrix_type simple_multiply(const matrix_type& lhs, const matrix_type& rhs) {
+matrix_type simple_multiply(const matrix_type& x, const matrix_type& y) {
     matrix_type result;
     for (size_t row = 0; row < matrix_size; ++row) {
         for (size_t column = 0; column < matrix_size; ++column) {
-            result(row, column) = dot_product(lhs, rhs, row, column);
+            result(row, column) = dot_product(x, y, row, column);
         }
     }
     return std::move(result);
 }
 
-matrix_type actor_multiply(const matrix_type& lhs, const matrix_type& rhs) {
-    matrix_type result;
-    for (size_t row = 0; row < matrix_size; ++row) {
-        for (size_t column = 0; column < matrix_size; ++column) {
-            spawn([&,row,column] {
-                result(row, column) = dot_product(lhs, rhs, row, column);
-            });
-        }
-    }
-    await_all_actors_done();
-    return std::move(result);
+matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
+  actor_system system;
+  matrix_type result;
+  for (size_t row = 0; row < matrix_size; ++row)
+    for (size_t column = 0; column < matrix_size; ++column)
+      system.spawn([&, row, column] {
+        result(row, column) = dot_product(x, y, row, column);
+      });
+  system.await_all_actors_done();
+  return std::move(result);
 }
 
-matrix_type actor_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
-    matrix_type result;
-    for (size_t row = 0; row < matrix_size; ++row) {
-        spawn([&,row] {
-            for (size_t column = 0; column < matrix_size; ++column) {
-                result(row, column) = dot_product(lhs, rhs, row, column);
-            }
-        });
-    }
-    await_all_actors_done();
-    return std::move(result);
+matrix_type actor_multiply2(const matrix_type& x, const matrix_type& y) {
+  actor_system system;
+  matrix_type result;
+  for (size_t row = 0; row < matrix_size; ++row)
+    system.spawn([&, row] {
+      for (size_t column = 0; column < matrix_size; ++column) {
+        result(row, column) = dot_product(x, y, row, column);
+      }
+    });
+  system.await_all_actors_done();
+  return std::move(result);
 }
 
-matrix_type async_multiply(const matrix_type& lhs, const matrix_type& rhs) {
-    matrix_type result;
-    vector<future<void>> futures;
-    futures.reserve(matrix_size * matrix_size);
-    for (size_t row = 0; row < matrix_size; ++row) {
-        for (size_t column = 0; column < matrix_size; ++column) {
-            futures.push_back(std::async(std::launch::async, [&,row,column] {
-                result(row, column) = dot_product(lhs, rhs, row, column);
-            }));
-        }
+matrix_type async_multiply(const matrix_type& x, const matrix_type& y) {
+  matrix_type result;
+  vector<future<void>> futures;
+  futures.reserve(matrix_size * matrix_size);
+  for (size_t row = 0; row < matrix_size; ++row) {
+    for (size_t column = 0; column < matrix_size; ++column) {
+      futures.push_back(std::async(std::launch::async, [&, row, column] {
+        result(row, column) = dot_product(x, y, row, column);
+      }));
     }
-    for (auto& f : futures) f.wait();
-    return std::move(result);
+  }
+  for (auto& f : futures)
+    f.wait();
+  return std::move(result);
 }
 
-matrix_type async_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
+matrix_type async_multiply2(const matrix_type& x, const matrix_type& y) {
     matrix_type result;
     vector<future<void>> futures;
     futures.reserve(matrix_size);
     for (size_t row = 0; row < matrix_size; ++row) {
         futures.push_back(std::async(std::launch::async, [&,row] {
             for (size_t column = 0; column < matrix_size; ++column) {
-                result(row, column) = dot_product(lhs, rhs, row, column);
+                result(row, column) = dot_product(x, y, row, column);
             }
         }));
     }
@@ -175,24 +186,24 @@ matrix_type async_multiply2(const matrix_type& lhs, const matrix_type& rhs) {
 }
 
 #ifdef ENABLE_OPENCL
-matrix_type opencl_multiply(const matrix_type& lhs, const matrix_type& rhs) {
+matrix_type opencl_multiply(const matrix_type& x, const matrix_type& y) {
     static constexpr const char* source = R"__(
-        __kernel void multiply(__global float* lhs,
-                               __global float* rhs,
+        __kernel void multiply(__global float* x,
+                               __global float* y,
                                __global float* result) {
             size_t size = get_global_size(0); // rows == columns
             size_t row = get_global_id(0);
             size_t column = get_global_id(1);
             float dot_product = 0;
             for (size_t k = 0; k < size; ++k) {
-                dot_product += lhs[k + column * size] * rhs[row + k * size];
+                dot_product += x[k + column * size] * y[row + k * size];
             }
             result[row + column * size] = dot_product;
         }
     )__";
     matrix_type result;
     auto worker = spawn_cl<vector<float> (const vector<float>&, const vector<float>&)>(source, "multiply", matrix_size, matrix_size);
-   send(worker, lhs.data(), rhs.data());
+   send(worker, x.data(), y.data());
     receive(
         on_arg_match >> [&](std::vector<float>& res_vec) {
             result = std::move(res_vec);
@@ -207,9 +218,6 @@ matrix_type opencl_multiply(const matrix_type&, const matrix_type&) {
 #endif
 
 int main(int argc, char** argv) {
-  announce<vector<int>>("std::vector<int>");
-  announce<vector<float>>("std::vector<float>");
-  announce<matrix_type>("matrix_type");
   if (argc != 2) {
     cerr << "usage: " << argv[0] << " --(simple|actor|async|opencl)" << endl;
     return -1;

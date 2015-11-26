@@ -96,9 +96,9 @@ bool mandatory_missing(std::set<std::string> opts,
   return std::any_of(xs.begin(), xs.end(), not_in_opts);
 }
 
-bool setup(int argc, char** argv, int& workload) {
+bool setup(int argc, char** argv, std::string& labels_output_file,
+           int& workload, actor_system_config& cfg) {
   std::string profiler_output_file;
-  std::string labels_output_file;
   long long profiler_resolution_ms = 100;
   size_t scheduler_threads = std::thread::hardware_concurrency();
   size_t max_msg_per_run = std::numeric_limits<size_t>::max();
@@ -113,100 +113,88 @@ bool setup(int argc, char** argv, int& workload) {
   if (! res.error.empty() || res.opts.count("help") > 0
       || ! res.remainder.empty()
       || mandatory_missing(res.opts, {"output", "labels", "workload"})) {
-    cout << res.error << endl << res.helptext << endl;
-    return false;
+    return cout << res.error << endl << res.helptext << endl, false;
   }
-  using impl = scheduler::profiled_coordinator<>;
-  set_scheduler(new impl{profiler_output_file,
-                         milliseconds(profiler_resolution_ms),
-                         scheduler_threads, max_msg_per_run});
-  actor_ostream::redirect_all(labels_output_file);
+  cfg.scheduler_enable_profiling = true;
+  cfg.scheduler_profiling_ms_resolution = profiler_resolution_ms;
+  cfg.scheduler_max_threads = scheduler_threads;
+  cfg.scheduler_max_throughput = max_msg_per_run;
+  if (workload < 0 || workload > 5)
+    return false;
   return true;
 }
 
 /// Spawn 20 `task_worker` and give them work,
 /// the work has variation in its complexity (0 to 4)
-void workload_1() {
+void impl1(actor_system& system) {
   vector<actor> workers;
-  for (int i = 0; i < 20; ++i) {
-    workers.push_back(spawn<lazy_init>(task_worker));
-  }
-  for (int j = 0; j < 10; ++j) {
-    for (int i = 0; i < 5; ++i) {
-      for (auto& w : workers) {
+  for (int i = 0; i < 20; ++i)
+    workers.push_back(system.spawn<lazy_init>(task_worker));
+  for (int j = 0; j < 10; ++j)
+    for (int i = 0; i < 5; ++i)
+      for (auto& w : workers)
         anon_send(w, task_atom::value, i, hrc::now());
-      }
-    }
-  }
-  for (auto& w : workers) {
+  for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
-  }
 }
 
 /// Spawn 2^15 `recursive_worker`
-void workload_2() {
-  auto root = spawn(recursive_worker, invalid_actor);
+void impl2(actor_system& system) {
+  auto root = system.spawn(recursive_worker, invalid_actor);
   anon_send(root, task_atom::value, uint32_t{15});
 }
 
 /// Spawn 20 `task_worker`and give them work,
 /// the work has variation in its complexity (0 to 4)
 /// In addition, this will spawn 2^15 `recursive_worker`
-void workload_3() {
+void impl3(actor_system& system) {
   vector<actor> workers;
-  for (int i = 0; i < 20; ++i) {
-    workers.push_back(spawn<lazy_init>(task_worker));
-  }
-  for (int j = 0; j < 10; ++j) {
-    for (int i = 0; i < 5; ++i) {
-      for (auto& w : workers) {
+  for (int i = 0; i < 20; ++i)
+    workers.push_back(system.spawn<lazy_init>(task_worker));
+  for (int j = 0; j < 10; ++j)
+    for (int i = 0; i < 5; ++i)
+      for (auto& w : workers)
         anon_send(w, task_atom::value, i, hrc::now());
-      }
-    }
-  }
-  auto root = spawn(recursive_worker, invalid_actor);
+  auto root = system.spawn(recursive_worker, invalid_actor);
   anon_send(root, task_atom::value, uint32_t{15});
-  for (auto& w : workers) {
+  for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
-  }
   anon_send_exit(root, exit_reason::user_shutdown);
 }
 
 /// Spawn 5 `task_worker` and give them work
 /// then spawn 2^15 `recursive_worker`. This is
 /// repeated 10 times.
-void workload_4() {
+void impl4(actor_system& system) {
   vector<actor> workers;
   for (int j = 0; j < 10; ++j) {
-    for (int i = 0; i < 5; ++i) {
-      for (auto& w : workers) {
+    for (int i = 0; i < 5; ++i)
+      for (auto& w : workers)
         anon_send(w, task_atom::value, i, hrc::now());
-      }
-    }
-    auto root = spawn(recursive_worker, invalid_actor);
+    auto root = system.spawn(recursive_worker, invalid_actor);
     anon_send(root, task_atom::value, uint32_t{15});
-    for (int i = 0; i < 5; ++i) {
-      workers.push_back(spawn<lazy_init>(task_worker));
-    }
+    for (int i = 0; i < 5; ++i)
+      workers.push_back(system.spawn<lazy_init>(task_worker));
     anon_send_exit(root, exit_reason::user_shutdown);
   }
-  for (auto& w : workers) {
+  for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
-  }
 }
 
 /// Spawn 5 `recursive_worker` in an actor pool
 /// after that, 5 `task_worker` are spawnend in an actor pool
-void workload_5() {
-  auto factory = [] {
-    return spawn(recursive_worker, invalid_actor);
+void impl5(actor_system& system) {
+  auto factory = [&] {
+    return system.spawn(recursive_worker, invalid_actor);
   };
-  auto pool = actor_pool::make(5, factory, actor_pool::broadcast());
+  auto pool = actor_pool::make(system.dummy_execution_unit(),
+                               5, factory, actor_pool::broadcast());
   anon_send(pool, task_atom::value, uint32_t{15});
-  auto factory_task = [] {
-    return spawn(task_worker);
+  auto factory_task = [&] {
+    return system.spawn(task_worker);
   };
-  auto pool2 = actor_pool::make(5, factory_task, actor_pool::broadcast());
+  auto pool2 = actor_pool::make(system.dummy_execution_unit(),
+                                5, factory_task, actor_pool::broadcast());
   for (int j = 0; j < 10; ++j) {
     for (int i = 0; i < 9; ++i) {
       anon_send(pool2, task_atom::value, i, hrc::now());
@@ -218,13 +206,14 @@ void workload_5() {
 /// Spawn either 2^15 `recursive_worker` or a actor pool with 10 actors
 /// of `task_worker` type. This is repeated 20 times, on every even count this
 /// workload will spawn `recursive_worker`, on odd count `task_worker`.
-void workload_6() {
+void impl6(actor_system& system) {
   for (int i = 0; i < 20; ++i) {
     if (i % 2) {
-      auto root = spawn(recursive_worker, invalid_actor);
-      anon_send(root, task_atom::value, uint32_t{15});
+      anon_send(system.spawn(recursive_worker, invalid_actor),
+                task_atom::value, uint32_t{15});
     } else {
-      auto pool = actor_pool::make(10, []{ return spawn(task_worker); },
+      auto pool = actor_pool::make(system.dummy_execution_unit(), 10,
+                                   [&]{ return system.spawn(task_worker); },
                                    actor_pool::broadcast());
       anon_send(pool, task_atom::value, i, hrc::now());
       anon_send_exit(pool, exit_reason::user_shutdown);
@@ -234,29 +223,14 @@ void workload_6() {
 
 int main(int argc, char** argv) {
   int workload = 0;
-  if (! setup(argc, argv, workload)) {
+  actor_system_config cfg;
+  std::string labels_output_file;
+  if (! setup(argc, argv, labels_output_file, workload, cfg))
     return 1;
-  }
-  switch(workload) {
-    case 1:
-      workload_1();
-      break;
-    case 2:
-      workload_2();
-      break;
-    case 3:
-      workload_3();
-      break;
-    case 4:
-      workload_4();
-      break;
-    case 5:
-      workload_5();
-      break;
-    case 6:
-      workload_6();
-      break;
-  }
-  await_all_actors_done();
-  shutdown();
+  actor_system system(cfg);
+  actor_ostream::redirect_all(system, labels_output_file);
+  using implfun = void (*)(actor_system&);
+  implfun funs[] = {impl1, impl2, impl3, impl4, impl5, impl6};
+  funs[workload](system);
+  system.await_all_actors_done();
 }

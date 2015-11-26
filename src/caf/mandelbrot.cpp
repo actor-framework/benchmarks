@@ -12,10 +12,8 @@ using namespace std;
 using namespace caf;
 
 int main(int argc, char* argv[]) {
-  if (argc != 2) {
-    cout << "usage: ./" << argv[0] << " N" << endl;
-    return 0;
-  }
+  if (argc != 2)
+    return cout << "usage: ./" << argv[0] << " N" << endl, 1;
   const size_t N              = static_cast<size_t>(atoi(argv[1]));
   const size_t width          = N;
   const size_t height         = N;
@@ -23,21 +21,18 @@ int main(int argc, char* argv[]) {
   const size_t max_iterations = 250;
   const double limit          = 2.0;
   const double limit_sq       = limit * limit;
-
   vector<byte> buffer(height * max_x);
   vector<double> cr0(8 * max_x);
-
   for (size_t x = 0; x < max_x; ++x) {
     for (size_t k = 0; k < 8; ++k) {
       const size_t xk = 8 * x + k;
       cr0[xk] = (2.0 * xk) / width - 1.5;
     }
   }
-
-
+  actor_system system;
   for (size_t y = 0; y < height; ++y) {
     byte* line = &buffer[y * max_x];
-    spawn([=] {
+    system.spawn([=] {
       const double ci0 = 2.0 * y / height - 1.0;
       for (size_t x = 0; x < max_x; ++x) {
         const double* cr0_x = &cr0[8 * x];
@@ -69,10 +64,7 @@ int main(int argc, char* argv[]) {
       }
     });
   }
-
-  await_all_actors_done();
-  shutdown();
-
+  system.await_all_actors_done();
   //FILE* out = (argc == 3) ? fopen(argv[2], "wb") : stdout;
   //fprintf(out, "P4\n%u %u\n", width, height);
   //fwrite(&buffer[0], buffer.size(), 1, out);

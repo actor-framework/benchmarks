@@ -147,9 +147,10 @@ int main(int argc, char** argv) {
     return 1;
   }
   // start background workers
-  auto dog = spawn<detached + blocking_api>(watchdog, max_runtime);
-  auto rec = spawn<detached + blocking_api>(memrecord, poll_interval,
-                                            &mem_out_buf);
+  actor_system system;
+  auto dog = system.spawn<detached + blocking_api>(watchdog, max_runtime);
+  auto rec = system.spawn<detached + blocking_api>(memrecord, poll_interval,
+                                                   &mem_out_buf);
   cout << "fork into " << argv[6] << endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
@@ -190,8 +191,7 @@ int main(int argc, char** argv) {
   anon_send_exit(rec, exit_reason::user_shutdown);
   cout << "exit status: " << child_exit_status << endl;
   cout << "program did run for " << duration.count() << "ms" << endl;
-  await_all_actors_done();
-  shutdown();
+  system.await_all_actors_done();
   if (child_exit_status == 0) {
     runtime_out << duration.count() << endl;
     mem_out << mem_out_buf.str() << flush;

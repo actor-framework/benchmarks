@@ -89,7 +89,8 @@ int main(int argc, char** argv) {
     cerr << "invalid argument: " << argv[1] << endl;
     usage();
   }
-  anon_send(spawn<lazy_init>(testee, invalid_actor), spread_atom::value, s_num);
-  await_all_actors_done();
-  shutdown();
+  actor_system system;
+  anon_send(system.spawn<lazy_init>(testee, invalid_actor),
+            spread_atom::value, s_num);
+  system.await_all_actors_done();
 }

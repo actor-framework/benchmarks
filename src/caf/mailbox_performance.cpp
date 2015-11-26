@@ -29,32 +29,31 @@ using namespace caf;
 
 using msg_atom = atom_constant<atom("msg")>;
 
+namespace {
+
 class receiver : public event_based_actor {
  public:
-  receiver(uint64_t max) : m_max(max), m_value(0) {
+  receiver(actor_config& cfg, uint64_t max)
+      : event_based_actor(cfg),
+        max_(max),
+        value_(0) {
     // nop
   }
-
-  virtual ~receiver();
 
   behavior make_behavior() override {
     return {
       [=](msg_atom) {
-        if (++m_value == m_max) {
+        if (++value_ == max_)
           quit();
-        }
       }
     };
   }
 
  private:
-  uint64_t m_max;
-  uint64_t m_value;
+  uint64_t max_;
+  uint64_t value_;
 };
 
-receiver::~receiver() {
-  // nop
-}
 
 void sender(actor whom, uint64_t count) {
   if (!whom) return;
@@ -64,31 +63,30 @@ void sender(actor whom, uint64_t count) {
   }
 }
 
-void usage() {
-  cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD"
-       << endl << endl;
-  exit(1);
+int usage() {
+  return cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD"
+              << endl << endl, 1;
 }
 
 void run(uint64_t num_sender, uint64_t num_msgs) {
   auto total = num_sender * num_msgs;
-  auto testee = spawn<receiver>(total);
-  for (uint64_t i = 0; i < num_sender; ++i) {
-    spawn(sender, testee, num_msgs);
-  }
+  actor_system system;
+  auto testee = system.spawn<receiver>(total);
+  for (uint64_t i = 0; i < num_sender; ++i)
+    system.spawn(sender, testee, num_msgs);
+  system.await_all_actors_done();
 }
 
+} // namespace <anonymous>
+
 int main(int argc, char** argv) {
-  if (argc != 3) {
-    usage();
-  }
+  if (argc != 3)
+    return usage();
   try {
     run(static_cast<uint64_t>(stoll(argv[1])),
         static_cast<uint64_t>(stoll(argv[2])));
   }
   catch (std::exception&) {
-    usage();
+    return usage();
   }
-  await_all_actors_done();
-  shutdown();
 }

@@ -44,9 +44,9 @@ maybe<impl_type> implproj(const string& str) {
 
 int main(int argc, char** argv) {
   int result = 1;
-  announce<list<int>>("std::list<int>");
   message_builder{argv + 1, argv + argc}.apply({
-    on(implproj, spro<unsigned>) >> [&](impl_type impl, unsigned num_loops) {
+    on(implproj, arg_match) >> [&](impl_type impl, const std::string& arg) {
+      auto num_loops = std::stoi(arg);
       result = 0;
       message m1;
       message m2;
@@ -107,6 +107,5 @@ int main(int argc, char** argv) {
     },
     others() >> usage
   });
-  shutdown();
   return result;
 }

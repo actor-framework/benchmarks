@@ -58,7 +58,9 @@ void usage() {
 
 class ping_actor : public event_based_actor {
 public:
-  ping_actor(actor parent) : parent_(move(parent)) {
+  ping_actor(actor_config& cfg, actor parent)
+      : event_based_actor(cfg),
+        parent_(move(parent)) {
     // nop
   }
 
@@ -108,7 +110,7 @@ public:
           auto i = m_pongs.find(key);
           if (i == m_pongs.end()) {
             try {
-              auto p = io::remote_actor(host.c_str(), port);
+              auto p = system().middleman().remote_actor(host.c_str(), port);
               link_to(p);
               m_pongs.insert(make_pair(key, p));
             }

@@ -42,8 +42,6 @@ using calc_atom = atom_constant<atom("calc")>;
 using done_atom = atom_constant<atom("done")>;
 using token_atom = atom_constant<atom("token")>;
 
-} // namespace <anonymous>
-
 factors factorize(uint64_t n) {
   factors result;
   if (n <= 3) {
@@ -94,30 +92,32 @@ behavior chain_link(event_based_actor* self, const actor& next) {
 
 class chain_master : public event_based_actor {
  public:
-    chain_master(actor msgcollector, int rs, uint64_t itv, int n)
-      : m_iteration(0),
-        m_ring_size(rs),
+    chain_master(actor_config& cfg, actor coll, int rs, uint64_t itv, int n)
+      : event_based_actor(cfg),
+        iteration_(0),
+        ring_size_(rs),
         m_initial_token_value(itv),
-        m_num_iterations(n),
-        m_mc(msgcollector) {
-      m_factorizer = spawn<detached>(worker);
-      new_ring();
+        num_iterations_(n),
+        mc_(coll) {
+      // nop
     }
-    ~chain_master();
+
     behavior make_behavior() override {
+      factorizer_ = spawn<detached>(worker);
+      new_ring();
       return {
         [=](token_atom, uint64_t& value) {
           if (value == 0) {
-            if (++m_iteration < m_num_iterations) {
+            if (++iteration_ < num_iterations_) {
               new_ring();
             } else {
-              send(m_factorizer, done_atom::value);
-              send(m_mc, done_atom::value);
+              send(factorizer_, done_atom::value);
+              send(mc_, done_atom::value);
               quit();
             }
           } else {
             value -= 1;
-            forward_to(m_next);
+            forward_to(next_);
           }
         }
       };
@@ -125,70 +125,64 @@ class chain_master : public event_based_actor {
 
  private:
   void new_ring() {
-    send_as(m_mc, m_factorizer, calc_atom::value, s_task_n);
-    m_next = this;
-    for (int i = 1; i < m_ring_size; ++i) {
-      m_next = spawn<lazy_init>(chain_link, m_next);
-    }
-    send(m_next, token_atom::value, m_initial_token_value);
+    send_as(mc_, factorizer_, calc_atom::value, s_task_n);
+    next_ = this;
+    for (int i = 1; i < ring_size_; ++i)
+      next_ = spawn<lazy_init>(chain_link, next_);
+    send(next_, token_atom::value, m_initial_token_value);
   }
-  int m_iteration;
-  int m_ring_size;
+  int iteration_;
+  int ring_size_;
   uint64_t m_initial_token_value;
-  int m_num_iterations;
-  actor m_mc;
-  actor m_next;
-  actor m_factorizer;
+  int num_iterations_;
+  actor mc_;
+  actor next_;
+  actor factorizer_;
 };
 
-chain_master::~chain_master() {
-  // nop
-}
-
-class supervisor : public event_based_actor{
+class supervisor : public event_based_actor {
  public:
-  supervisor(int num_msgs) : m_left(num_msgs) {
+  supervisor(actor_config& cfg, int num_msgs)
+      : event_based_actor(cfg),
+        left_(num_msgs) {
     // nop
   }
-  ~supervisor();
+
   behavior make_behavior() override {
     return {
-      [=](done_atom) {
-        if (--m_left == 0) {
-          quit();
-        }
-      },
       [=](const factors& vec) {
         check_factors(vec);
-        if (--m_left == 0) {
+        if (--left_ == 0)
           quit();
-        }
+      },
+      [=](done_atom) {
+        if (--left_ == 0)
+          quit();
       }
     };
   }
+
  private:
-  int m_left;
+  int left_;
 };
 
-supervisor::~supervisor() {
-  // nop
-}
+} // namespace <anonymous>
 
 int main(int argc, char** argv) {
-  if (argc != 5) {
-    cout << "usage: mixed_case "
-            "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS"
-         << endl << endl;
-    return 1;
-  }
-  announce<factors>("factors");
-  int num_rings = atoi(argv[1]);
-  int ring_size = atoi(argv[2]);
+  if (argc != 5)
+    return cout << "usage: mixed_case "
+                   "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS"
+                << endl << endl, 1;
+  auto num_rings = atoi(argv[1]);
+  auto ring_size = atoi(argv[2]);
   auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
-  int repetitions = atoi(argv[4]);
-  auto sv = spawn<supervisor, lazy_init>(num_rings + (num_rings * repetitions));
-  for (int i = 0; i < num_rings; ++i) {
-    spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
-  }
-  await_all_actors_done();
+  auto repetitions = atoi(argv[4]);
+  actor_system_config cfg;
+  cfg.add_message_type<factors>("factors");
+  actor_system system{cfg};
+  auto sv = system.spawn<supervisor, lazy_init>(num_rings
+                                                + (num_rings * repetitions));
+  for (int i = 0; i < num_rings; ++i)
+    system.spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
+  system.await_all_actors_done();
 }
