@@ -124,6 +124,8 @@ bool setup(int argc, char** argv, std::string& labels_output_file,
   return true;
 }
 
+CAF_ALLOW_UNSAFE_MESSAGE_TYPE(decltype(hrc::now()))
+
 /// Spawn 20 `task_worker` and give them work,
 /// the work has variation in its complexity (0 to 4)
 void impl1(actor_system& system) {
@@ -232,5 +234,4 @@ int main(int argc, char** argv) {
   using implfun = void (*)(actor_system&);
   implfun funs[] = {impl1, impl2, impl3, impl4, impl5, impl6};
   funs[workload](system);
-  system.await_all_actors_done();
 }

@@ -74,7 +74,6 @@ void run(uint64_t num_sender, uint64_t num_msgs) {
   auto testee = system.spawn<receiver>(total);
   for (uint64_t i = 0; i < num_sender; ++i)
     system.spawn(sender, testee, num_msgs);
-  system.await_all_actors_done();
 }
 
 } // namespace <anonymous>

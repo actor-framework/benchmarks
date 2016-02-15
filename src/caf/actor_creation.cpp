@@ -79,9 +79,8 @@ void usage() {
 }
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
+  if (argc != 2)
     usage();
-  }
   try {
     s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   }
@@ -92,5 +91,4 @@ int main(int argc, char** argv) {
   actor_system system;
   anon_send(system.spawn<lazy_init>(testee, invalid_actor),
             spread_atom::value, s_num);
-  system.await_all_actors_done();
 }

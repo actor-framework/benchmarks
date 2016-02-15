@@ -64,7 +64,6 @@ int main(int argc, char* argv[]) {
       }
     });
   }
-  system.await_all_actors_done();
   //FILE* out = (argc == 3) ? fopen(argv[2], "wb") : stdout;
   //fprintf(out, "P4\n%u %u\n", width, height);
   //fwrite(&buffer[0], buffer.size(), 1, out);

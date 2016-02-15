@@ -121,6 +121,9 @@ inline bool operator==(const bar& lhs, const bar& rhs) {
   return lhs.a == rhs.a && lhs.b == rhs.b;
 }
 
+CAF_ALLOW_UNSAFE_MESSAGE_TYPE(foo)
+CAF_ALLOW_UNSAFE_MESSAGE_TYPE(bar)
+
 void run_match_bench_with_builtin_only() {
   std::vector<message> v1{make_message(1, 2),
                           make_message(1.0, 2.0),

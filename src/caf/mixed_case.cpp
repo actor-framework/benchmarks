@@ -184,5 +184,4 @@ int main(int argc, char** argv) {
                                                 + (num_rings * repetitions));
   for (int i = 0; i < num_rings; ++i)
     system.spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
-  system.await_all_actors_done();
 }

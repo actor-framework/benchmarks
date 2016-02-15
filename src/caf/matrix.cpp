@@ -39,6 +39,8 @@ class square_matrix {
 public:
   static constexpr size_t num_elements = Size * Size;
 
+  using value_type = float;
+
   square_matrix(square_matrix&&) = default;
   square_matrix(const square_matrix&) = default;
   square_matrix& operator=(square_matrix&&) = default;
@@ -137,7 +139,6 @@ matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
       system.spawn([&, row, column] {
         result(row, column) = dot_product(x, y, row, column);
       });
-  system.await_all_actors_done();
   return std::move(result);
 }
 
@@ -150,7 +151,6 @@ matrix_type actor_multiply2(const matrix_type& x, const matrix_type& y) {
         result(row, column) = dot_product(x, y, row, column);
       }
     });
-  system.await_all_actors_done();
   return std::move(result);
 }
 
