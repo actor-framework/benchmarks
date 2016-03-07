@@ -139,7 +139,8 @@ int main(int argc, char** argv) {
   std::fstream mem_out{mem_out_fname, ios_base::out};
   std::ostringstream mem_out_buf;
   if (!runtime_out) {
-    cerr << "unable to open file for runtime output: " << runtime_out_fname << endl;
+    cerr << "unable to open file for runtime output: "
+         << runtime_out_fname << endl;
     return 1;
   }
   if (!mem_out) {
@@ -148,9 +149,8 @@ int main(int argc, char** argv) {
   }
   // start background workers
   actor_system system;
-  auto dog = system.spawn<detached + blocking_api>(watchdog, max_runtime);
-  auto rec = system.spawn<detached + blocking_api>(memrecord, poll_interval,
-                                                   &mem_out_buf);
+  auto dog = system.spawn<detached>(watchdog, max_runtime);
+  auto rec = system.spawn<detached>(memrecord, poll_interval, &mem_out_buf);
   cout << "fork into " << argv[6] << endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
