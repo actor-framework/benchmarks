@@ -102,33 +102,32 @@ private:
 };
 
 template<size_t Size>
-inline bool operator==(const square_matrix<Size>& x, const square_matrix<Size>& y) {
+bool operator==(const square_matrix<Size>& x, const square_matrix<Size>& y) {
     return std::equal(x.begin(), x.end(), y.begin());
 }
 
 template<size_t Size>
-inline bool operator!=(const square_matrix<Size>& x, const square_matrix<Size>& y) {
+bool operator!=(const square_matrix<Size>& x, const square_matrix<Size>& y) {
     return !(x == y);
 }
 
 using matrix_type = square_matrix<matrix_size>;
 
-float dot_product(const matrix_type& x, const matrix_type& y, size_t row, size_t column) {
-    float result = 0.0f;
-    for (size_t k = 0; k < matrix_size; ++k) {
-        result += x(row, k) * y(k, column);
-    }
-    return result;
+float dot_product(const matrix_type& x,
+                  const matrix_type& y,
+                  size_t row, size_t column) {
+  float result = 0.0f;
+  for (size_t k = 0; k < matrix_size; ++k)
+    result += x(row, k) * y(k, column);
+  return result;
 }
 
 matrix_type simple_multiply(const matrix_type& x, const matrix_type& y) {
-    matrix_type result;
-    for (size_t row = 0; row < matrix_size; ++row) {
-        for (size_t column = 0; column < matrix_size; ++column) {
-            result(row, column) = dot_product(x, y, row, column);
-        }
-    }
-    return std::move(result);
+  matrix_type result;
+  for (size_t row = 0; row < matrix_size; ++row)
+    for (size_t column = 0; column < matrix_size; ++column)
+      result(row, column) = dot_product(x, y, row, column);
+  return std::move(result);
 }
 
 matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
@@ -154,6 +153,15 @@ matrix_type actor_multiply2(const matrix_type& x, const matrix_type& y) {
   return std::move(result);
 }
 
+#if defined(CAF_GCC) && defined(CAF_MACOS)
+matrix_type async_multiply(const matrix_type&, const matrix_type&) {
+  throw std::logic_error("Not available on this platform");
+}
+
+matrix_type async_multiply2(const matrix_type&, const matrix_type&) {
+  throw std::logic_error("Not available on this platform");
+}
+#else // defined(CAF_GCC) && defined(CAF_MACOS)
 matrix_type async_multiply(const matrix_type& x, const matrix_type& y) {
   matrix_type result;
   vector<future<void>> futures;
@@ -171,19 +179,21 @@ matrix_type async_multiply(const matrix_type& x, const matrix_type& y) {
 }
 
 matrix_type async_multiply2(const matrix_type& x, const matrix_type& y) {
-    matrix_type result;
-    vector<future<void>> futures;
-    futures.reserve(matrix_size);
-    for (size_t row = 0; row < matrix_size; ++row) {
-        futures.push_back(std::async(std::launch::async, [&,row] {
-            for (size_t column = 0; column < matrix_size; ++column) {
-                result(row, column) = dot_product(x, y, row, column);
-            }
-        }));
-    }
-    for (auto& f : futures) f.wait();
-    return std::move(result);
+  matrix_type result;
+  vector<future<void>> futures;
+  futures.reserve(matrix_size);
+  for (size_t row = 0; row < matrix_size; ++row) {
+    futures.push_back(std::async(std::launch::async, [&,row] {
+      for (size_t column = 0; column < matrix_size; ++column) {
+        result(row, column) = dot_product(x, y, row, column);
+      }
+    }));
+  }
+  for (auto& f : futures)
+    f.wait();
+  return std::move(result);
 }
+#endif // defined(CAF_GCC) && defined(CAF_MACOS)
 
 #ifdef ENABLE_OPENCL
 matrix_type opencl_multiply(const matrix_type& x, const matrix_type& y) {
@@ -202,7 +212,11 @@ matrix_type opencl_multiply(const matrix_type& x, const matrix_type& y) {
         }
     )__";
     matrix_type result;
-    auto worker = spawn_cl<vector<float> (const vector<float>&, const vector<float>&)>(source, "multiply", matrix_size, matrix_size);
+    auto worker = spawn_cl<vector<float>(const vector<float>&,
+                                         const vector<float>&)>(source,
+                                                                "multiply",
+                                                                matrix_size,
+                                                                matrix_size);
    send(worker, x.data(), y.data());
     receive(
         on_arg_match >> [&](std::vector<float>& res_vec) {
