@@ -127,7 +127,7 @@ matrix_type simple_multiply(const matrix_type& x, const matrix_type& y) {
   for (size_t row = 0; row < matrix_size; ++row)
     for (size_t column = 0; column < matrix_size; ++column)
       result(row, column) = dot_product(x, y, row, column);
-  return std::move(result);
+  return result;
 }
 
 matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
@@ -138,7 +138,7 @@ matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
       system.spawn([&, row, column] {
         result(row, column) = dot_product(x, y, row, column);
       });
-  return std::move(result);
+  return result;
 }
 
 matrix_type actor_multiply2(const matrix_type& x, const matrix_type& y) {
@@ -150,7 +150,7 @@ matrix_type actor_multiply2(const matrix_type& x, const matrix_type& y) {
         result(row, column) = dot_product(x, y, row, column);
       }
     });
-  return std::move(result);
+  return result;
 }
 
 #if defined(CAF_GCC) && defined(CAF_MACOS)
@@ -175,7 +175,7 @@ matrix_type async_multiply(const matrix_type& x, const matrix_type& y) {
   }
   for (auto& f : futures)
     f.wait();
-  return std::move(result);
+  return result;
 }
 
 matrix_type async_multiply2(const matrix_type& x, const matrix_type& y) {
@@ -191,7 +191,7 @@ matrix_type async_multiply2(const matrix_type& x, const matrix_type& y) {
   }
   for (auto& f : futures)
     f.wait();
-  return std::move(result);
+  return result;
 }
 #endif // defined(CAF_GCC) && defined(CAF_MACOS)
 
