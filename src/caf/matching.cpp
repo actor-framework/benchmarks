@@ -36,10 +36,12 @@ void usage() {
 
 enum impl_type { static_tuple, dynamic_tuple };
 
-maybe<impl_type> implproj(const string& str) {
-  if (str == "cow_tuple") return static_tuple;
-  else if (str == "object_array") return dynamic_tuple;
-  return {};
+optional<impl_type> implproj(const string& str) {
+  if (str == "cow_tuple")
+    return static_tuple;
+  if (str == "object_array")
+    return dynamic_tuple;
+  return none;
 }
 
 int main(int argc, char** argv) {

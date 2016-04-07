@@ -236,18 +236,23 @@ int main(int argc, char** argv) {
     cerr << "usage: " << argv[0] << " --(simple|actor|async|opencl)" << endl;
     return -1;
   }
+  using fun = matrix_type (*)(const matrix_type&, const matrix_type&);
+  std::map<string, fun> funs{
+    {"--simple", simple_multiply},
+    {"--actor", actor_multiply},
+    {"--actor2", actor_multiply2},
+    {"--async", async_multiply},
+    {"--async2", async_multiply2},
+    {"--opencl", opencl_multiply}
+  };
+  auto x = funs.find(argv[1]);
+  if (x == funs.end()) {
+    cerr << "invalid command line option" << endl;
+    return -1;
+  }
   matrix_type a;
   a.iota_fill();
   matrix_type b;
   b.iota_fill();
-  message_builder mb;
-  mb.append(argv[1]).append(std::move(a)).append(std::move(b)).apply({
-    on("--simple", arg_match) >> simple_multiply,
-    on("--actor", arg_match) >> actor_multiply,
-    on("--actor2", arg_match) >> actor_multiply2,
-    on("--async", arg_match) >> async_multiply,
-    on("--async2", arg_match) >> async_multiply2,
-    on("--opencl", arg_match) >> opencl_multiply,
-    others >> [] { cerr << "invalid arguments" << endl; }
-  });
+  (x->second)(a, b);
 }
