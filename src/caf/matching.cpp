@@ -30,6 +30,13 @@
 using namespace std;
 using namespace caf;
 
+using msg1_atom = atom_constant<atom("msg1")>;
+using msg2_atom = atom_constant<atom("msg2")>;
+using msg3_atom = atom_constant<atom("msg3")>;
+using msg4_atom = atom_constant<atom("msg4")>;
+using msg5_atom = atom_constant<atom("msg5")>;
+using msg6_atom = atom_constant<atom("msg6")>;
+
 void usage() {
   cout << "usage: matching (cow_tuple|object_array) NUM_LOOPS" << endl;
 }
@@ -46,8 +53,12 @@ optional<impl_type> implproj(const string& str) {
 
 int main(int argc, char** argv) {
   int result = 1;
-  message_builder{argv + 1, argv + argc}.apply({
-    on(implproj, arg_match) >> [&](impl_type impl, const std::string& arg) {
+  auto res = message_builder{argv + 1, argv + argc}.apply({
+    [&](const std::string& impl_str, const std::string& arg) {
+      auto impl_opt = implproj(impl_str);
+      if (! impl_opt)
+        return;
+      auto impl = *impl_opt;
       auto num_loops = std::stoi(arg);
       result = 0;
       message m1;
@@ -84,12 +95,12 @@ int main(int argc, char** argv) {
       int64_t m5matched = 0;
       int64_t m6matched = 0;
       message_handler part_fun{
-        on<atom("msg1"), int>() >> [&]() { ++m1matched; },
-        on<atom("msg2"), double>() >> [&]() { ++m2matched; },
-        on<atom("msg3"), list<int> >() >> [&]() { ++m3matched; },
-        on<atom("msg4"), int, string>() >> [&]() { ++m4matched; },
-        on<atom("msg5"), int, int, int>() >> [&]() { ++m5matched; },
-        on<atom("msg6"), int, double, string>() >> [&]() { ++m6matched; }
+        [&](msg1_atom, int) { ++m1matched; },
+        [&](msg2_atom, double) { ++m2matched; },
+        [&](msg3_atom, list<int>) { ++m3matched; },
+        [&](msg4_atom, int, string) { ++m4matched; },
+        [&](msg5_atom, int, int, int) { ++m5matched; },
+        [&](msg6_atom, int, double, string) { ++m6matched; }
       };
       for (int64_t i = 0; i < num_loops; ++i) {
           part_fun(m1);
@@ -106,8 +117,9 @@ int main(int argc, char** argv) {
       assert(m5matched == num_loops);
       assert(m6matched == num_loops);
       result = 0;
-    },
-    others() >> usage
+    }
   });
+  if (! res)
+    usage();
   return result;
 }
