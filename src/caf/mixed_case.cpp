@@ -83,9 +83,10 @@ behavior worker(event_based_actor* self) {
 
 behavior chain_link(event_based_actor* self, const actor& next) {
   return {
-    [=](token_atom, uint64_t value) {
-      if (value == 0) self->quit();
-      self->forward_to(next);
+    [=](token_atom tk, uint64_t value) {
+      if (value == 0)
+        self->quit();
+      self->delegate(next, tk, value);
     }
   };
 }
@@ -106,7 +107,7 @@ class chain_master : public event_based_actor {
       factorizer_ = spawn<detached>(worker);
       new_ring();
       return {
-        [=](token_atom, uint64_t& value) {
+        [=](token_atom tk, uint64_t value) {
           if (value == 0) {
             if (++iteration_ < num_iterations_) {
               new_ring();
@@ -117,7 +118,7 @@ class chain_master : public event_based_actor {
             }
           } else {
             value -= 1;
-            forward_to(next_);
+            delegate(next_, tk, value);
           }
         }
       };
