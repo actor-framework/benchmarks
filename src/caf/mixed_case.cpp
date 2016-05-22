@@ -99,12 +99,13 @@ class chain_master : public event_based_actor {
         ring_size_(rs),
         m_initial_token_value(itv),
         num_iterations_(n),
-        mc_(coll) {
+        mc_(coll),
+        next_(this),
+        factorizer_(spawn<detached>(worker)) {
       // nop
     }
 
     behavior make_behavior() override {
-      factorizer_ = spawn<detached>(worker);
       new_ring();
       return {
         [=](token_atom tk, uint64_t value) {

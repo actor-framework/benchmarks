@@ -72,9 +72,7 @@ behavior recursive_worker(event_based_actor* self, actor parent) {
         [=](result_atom, uint32_t r1) {
           self->become (
             [=](result_atom, uint32_t r2) {
-              if (parent != invalid_actor) {
-                self->send(parent, result_atom::value, 1 + r1 + r2);
-              }
+              self->send(parent, result_atom::value, 1 + r1 + r2);
               self->quit();
             }
           );
@@ -142,7 +140,8 @@ void impl1(actor_system& system) {
 
 /// Spawn 2^15 `recursive_worker`
 void impl2(actor_system& system) {
-  auto root = system.spawn(recursive_worker, invalid_actor);
+  scoped_actor self{system};
+  auto root = system.spawn(recursive_worker, self);
   anon_send(root, task_atom::value, uint32_t{15});
 }
 
@@ -150,6 +149,7 @@ void impl2(actor_system& system) {
 /// the work has variation in its complexity (0 to 4)
 /// In addition, this will spawn 2^15 `recursive_worker`
 void impl3(actor_system& system) {
+  scoped_actor self{system};
   vector<actor> workers;
   for (int i = 0; i < 20; ++i)
     workers.push_back(system.spawn<lazy_init>(task_worker));
@@ -157,7 +157,7 @@ void impl3(actor_system& system) {
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
         anon_send(w, task_atom::value, i, hrc::now());
-  auto root = system.spawn(recursive_worker, invalid_actor);
+  auto root = system.spawn(recursive_worker, self);
   anon_send(root, task_atom::value, uint32_t{15});
   for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
@@ -168,12 +168,13 @@ void impl3(actor_system& system) {
 /// then spawn 2^15 `recursive_worker`. This is
 /// repeated 10 times.
 void impl4(actor_system& system) {
+  scoped_actor self{system};
   vector<actor> workers;
   for (int j = 0; j < 10; ++j) {
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
         anon_send(w, task_atom::value, i, hrc::now());
-    auto root = system.spawn(recursive_worker, invalid_actor);
+    auto root = system.spawn(recursive_worker, self);
     anon_send(root, task_atom::value, uint32_t{15});
     for (int i = 0; i < 5; ++i)
       workers.push_back(system.spawn<lazy_init>(task_worker));
@@ -186,8 +187,9 @@ void impl4(actor_system& system) {
 /// Spawn 5 `recursive_worker` in an actor pool
 /// after that, 5 `task_worker` are spawnend in an actor pool
 void impl5(actor_system& system) {
+  scoped_actor self{system};
   auto factory = [&] {
-    return system.spawn(recursive_worker, invalid_actor);
+    return system.spawn(recursive_worker, self);
   };
   auto pool = actor_pool::make(system.dummy_execution_unit(),
                                5, factory, actor_pool::broadcast());
@@ -209,9 +211,10 @@ void impl5(actor_system& system) {
 /// of `task_worker` type. This is repeated 20 times, on every even count this
 /// workload will spawn `recursive_worker`, on odd count `task_worker`.
 void impl6(actor_system& system) {
+  scoped_actor self{system};
   for (int i = 0; i < 20; ++i) {
     if (i % 2) {
-      anon_send(system.spawn(recursive_worker, invalid_actor),
+      anon_send(system.spawn(recursive_worker, self),
                 task_atom::value, uint32_t{15});
     } else {
       auto pool = actor_pool::make(system.dummy_execution_unit(), 10,

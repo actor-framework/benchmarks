@@ -51,7 +51,7 @@ behavior testee(event_based_actor* self, actor parent) {
         [=](result_atom, uint32_t r1) {
           self->become (
             [=](result_atom, uint32_t r2) {
-              if (parent == invalid_actor) {
+              /*if (parent == invalid_actor) {
                 uint32_t res = 2 + r1 + r2;
                 uint32_t expected = (1 << s_num);
                 if (res != expected) {
@@ -63,6 +63,8 @@ behavior testee(event_based_actor* self, actor parent) {
               } else {
                 self->send(parent, result_atom::value, 1 + r1 + r2);
               }
+              */
+              self->send(parent, result_atom::value, 1 + r1 + r2);
               self->quit();
             }
           );
@@ -89,6 +91,6 @@ int main(int argc, char** argv) {
     usage();
   }
   actor_system system;
-  anon_send(system.spawn<lazy_init>(testee, invalid_actor),
-            spread_atom::value, s_num);
+  scoped_actor self{system};
+  anon_send(system.spawn<lazy_init>(testee, self), spread_atom::value, s_num);
 }

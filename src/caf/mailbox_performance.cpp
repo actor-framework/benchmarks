@@ -56,11 +56,9 @@ class receiver : public event_based_actor {
 
 
 void sender(actor whom, uint64_t count) {
-  if (!whom) return;
   auto msg = make_message(msg_atom::value);
-  for (uint64_t i = 0; i < count; ++i) {
+  for (uint64_t i = 0; i < count; ++i)
     anon_send(whom, msg);
-  }
 }
 
 int usage() {
