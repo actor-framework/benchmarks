@@ -97,7 +97,7 @@ bool mandatory_missing(std::set<std::string> opts,
 bool setup(int argc, char** argv, std::string& labels_output_file,
            int& workload, actor_system_config& cfg) {
   std::string profiler_output_file;
-  long long profiler_resolution_ms = 100;
+  size_t profiler_resolution_ms = 100;
   size_t scheduler_threads = std::thread::hardware_concurrency();
   size_t max_msg_per_run = std::numeric_limits<size_t>::max();
   auto res = message_builder{argv + 1, argv + argc}.extract_opts({
