@@ -357,11 +357,15 @@ if(Boost_FOUND)
   add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
   target_link_libraries(to_csv ${LD_FLAGS})
 endif()
-add_executable(caf_run_bench "${TOOLS_DIR}/caf_run_bench.cpp")
-target_link_libraries(caf_run_bench ${CAF_LIBRARIES} ${LD_FLAGS})
-add_dependencies(all_benchmarks caf_run_bench)
-add_custom_target(caf_scripts_dummy SOURCES "${SCRIPTS_DIR}/run")
 
+if (WIN32)
+  message(STATUS "skip caf_run_bench (not supported on Windows)")
+else()
+  add_executable(caf_run_bench "${TOOLS_DIR}/caf_run_bench.cpp")
+  target_link_libraries(caf_run_bench ${CAF_LIBRARIES} ${LD_FLAGS})
+  add_dependencies(all_benchmarks caf_run_bench)
+  add_custom_target(caf_scripts_dummy SOURCES "${SCRIPTS_DIR}/run")
+endif()
 
 ################################################################################
 #                                   Scripts                                    #
