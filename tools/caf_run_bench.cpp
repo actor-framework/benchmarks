@@ -99,11 +99,18 @@ void memrecord(blocking_actor* self, int poll_interval, std::ostream* out_ptr) {
   fname += std::to_string(child);
   fname += "/status";
   self->send(self, poll_atom::value);
-  self->receive_loop(
+  bool running = true;
+  self->receive_while(running)(
     [&](poll_atom) {
       self->delayed_send(self, chrono::milliseconds(poll_interval),
                          poll_atom::value);
       print_rss(out , line_buf, fname, child);
+    },
+    [&](const exit_msg& msg) {
+      if (msg.reason) {
+       self->fail_state(std::move(msg.reason));
+       running = false;
+      }
     }
   );
 }
@@ -148,7 +155,8 @@ int main(int argc, char** argv) {
     return 1;
   }
   // start background workers
-  actor_system system;
+  actor_system_config cfg;
+  actor_system system{cfg};
   auto dog = system.spawn<detached>(watchdog, max_runtime);
   auto rec = system.spawn<detached>(memrecord, poll_interval, &mem_out_buf);
   cout << "fork into " << argv[6] << endl;

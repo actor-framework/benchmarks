@@ -90,7 +90,8 @@ int main(int argc, char** argv) {
     cerr << "invalid argument: " << argv[1] << endl;
     usage();
   }
-  actor_system system;
+  actor_system_config cfg;
+  actor_system system{cfg};
   scoped_actor self{system};
   anon_send(system.spawn<lazy_init>(testee, self), spread_atom::value, s_num);
 }

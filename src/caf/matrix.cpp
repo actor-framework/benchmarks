@@ -131,7 +131,8 @@ matrix_type simple_multiply(const matrix_type& x, const matrix_type& y) {
 }
 
 matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
-  actor_system system;
+  actor_system_config cfg;
+  actor_system system{cfg};
   matrix_type result;
   for (size_t row = 0; row < matrix_size; ++row)
     for (size_t column = 0; column < matrix_size; ++column)
@@ -142,7 +143,8 @@ matrix_type actor_multiply(const matrix_type& x, const matrix_type& y) {
 }
 
 matrix_type actor_multiply2(const matrix_type& x, const matrix_type& y) {
-  actor_system system;
+  actor_system_config cfg;
+  actor_system system{cfg};
   matrix_type result;
   for (size_t row = 0; row < matrix_size; ++row)
     system.spawn([&, row] {

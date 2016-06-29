@@ -29,7 +29,8 @@ int main(int argc, char* argv[]) {
       cr0[xk] = (2.0 * xk) / width - 1.5;
     }
   }
-  actor_system system;
+  actor_system_config cfg;
+  actor_system system{cfg};
   for (size_t y = 0; y < height; ++y) {
     byte* line = &buffer[y * max_x];
     system.spawn([=] {
