@@ -93,7 +93,8 @@ public:
   }
 
   template <class Inspector>
-  friend error inspect(Inspector& f, square_matrix& x) {
+  friend typename Inspector::result_type inspect(Inspector& f,
+                                                 square_matrix& x) {
     return f(meta::type_name("square_matrix"), x.data_);
   }
 
