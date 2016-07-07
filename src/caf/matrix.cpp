@@ -92,9 +92,9 @@ public:
     return data_;
   }
 
-  template <class T>
-  friend void serialize(T& in_or_out, square_matrix& x, const unsigned int) {
-    in_or_out & x.data_;
+  template <class Inspector>
+  friend error inspect(Inspector& f, square_matrix& x) {
+    return f(meta::type_name("square_matrix"), x.data_);
   }
 
 private:
