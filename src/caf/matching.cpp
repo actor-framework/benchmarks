@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
   auto res = message_builder{argv + 1, argv + argc}.apply({
     [&](const std::string& impl_str, const std::string& arg) {
       auto impl_opt = implproj(impl_str);
-      if (! impl_opt)
+      if (!impl_opt)
         return;
       auto impl = *impl_opt;
       auto num_loops = std::stoi(arg);
@@ -119,7 +119,7 @@ int main(int argc, char** argv) {
       result = 0;
     }
   });
-  if (! res)
+  if (!res)
     usage();
   return result;
 }

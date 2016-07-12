@@ -108,8 +108,8 @@ bool setup(int argc, char** argv, std::string& labels_output_file,
     {"max-msgs,m", "number of messages per actor run", max_msg_per_run},
     {"workload,w", "select workload to bench (1-10) (mandatory)", workload}
   });
-  if (! res.error.empty() || res.opts.count("help") > 0
-      || ! res.remainder.empty()
+  if (!res.error.empty() || res.opts.count("help") > 0
+      || !res.remainder.empty()
       || mandatory_missing(res.opts, {"output", "labels", "workload"})) {
     return cout << res.error << endl << res.helptext << endl, false;
   }
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
   int workload = 0;
   actor_system_config cfg;
   std::string labels_output_file;
-  if (! setup(argc, argv, labels_output_file, workload, cfg))
+  if (!setup(argc, argv, labels_output_file, workload, cfg))
     return 1;
   actor_system system(cfg);
   actor_ostream::redirect_all(system, labels_output_file);
