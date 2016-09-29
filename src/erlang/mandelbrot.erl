@@ -16,7 +16,7 @@ start(X) ->
     receive _Token -> halt(0) end.
 
 %Iterate over a row, collect bits, bytes and finally print the row
-row(X, _, N, Bits, Bytes, BitC) when X =:= N-1 ->
+row(X, _, N, _, _, _) when X =:= N-1 ->
     receive Pids ->
         hd(Pids) ! tl(Pids)
     end;

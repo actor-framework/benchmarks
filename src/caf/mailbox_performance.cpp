@@ -80,11 +80,6 @@ void run(uint64_t num_sender, uint64_t num_msgs) {
 int main(int argc, char** argv) {
   if (argc != 3)
     return usage();
-  try {
-    run(static_cast<uint64_t>(stoll(argv[1])),
-        static_cast<uint64_t>(stoll(argv[2])));
-  }
-  catch (std::exception&) {
-    return usage();
-  }
+  run(static_cast<uint64_t>(stoll(argv[1])),
+      static_cast<uint64_t>(stoll(argv[2])));
 }

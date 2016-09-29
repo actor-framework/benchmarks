@@ -124,13 +124,7 @@ void usage() {
 }
 
 int rd_int(const char* cstr) {
-  try {
-    return stoi(cstr);
-  }
-  catch (...) {
-    usage();
-  }
-  return 42; // unreachable
+  return atoi(cstr);
 }
 
 int main(int argc, char** argv) {
@@ -162,7 +156,8 @@ int main(int argc, char** argv) {
   cout << "fork into " << argv[6] << endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
-    throw std::logic_error("fork failed");
+    fprintf(stderr, "fork failed");
+    abort();
   }
   s_start = chrono::system_clock::now();
   if (child_pid == 0) {
@@ -185,9 +180,9 @@ int main(int argc, char** argv) {
     copy(first, last, back_inserter(arr));
     arr.push_back(nullptr);
     execv(*first, arr.data());
-    perror("execv");
     // should be unreachable
-    throw std::logic_error("execv failed");
+    fprintf(stderr, "execv failed");
+    abort();
   }
   auto msg = make_message(go_atom::value, child_pid);
   anon_send(dog, msg);

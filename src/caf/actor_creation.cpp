@@ -83,13 +83,7 @@ void usage() {
 int main(int argc, char** argv) {
   if (argc != 2)
     usage();
-  try {
-    s_num = static_cast<uint32_t>(std::stoi(argv[1]));
-  }
-  catch (std::exception&) {
-    cerr << "invalid argument: " << argv[1] << endl;
-    usage();
-  }
+  s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   actor_system_config cfg;
   actor_system system{cfg};
   scoped_actor self{system};

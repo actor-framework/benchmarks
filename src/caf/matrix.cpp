@@ -230,7 +230,8 @@ matrix_type opencl_multiply(const matrix_type& x, const matrix_type& y) {
 }
 #else
 matrix_type opencl_multiply(const matrix_type&, const matrix_type&) {
-    throw std::logic_error("Compiled w/o OpenCL");
+  fprintf(stderr, "Compiled w/o OpenCL support");
+  abort();
 }
 #endif
 
