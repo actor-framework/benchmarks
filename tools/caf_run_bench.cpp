@@ -82,6 +82,11 @@ void watchdog(blocking_actor* self, int max_runtime) {
   self->receive(
     [=](timeout_atom) {
       kill(child, 9);
+    },
+    [&](const exit_msg& msg) {
+      if (msg.reason) {
+       self->fail_state(std::move(msg.reason));
+      }
     }
   );
 }
