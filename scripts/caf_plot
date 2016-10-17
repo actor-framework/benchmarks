@@ -1,0 +1,281 @@
+#!/bin/bash
+
+# clean tmp file
+csv_tmp_file="tmp_data.csv"
+echo "" > "$csv_tmp_file"
+file_header_set=false
+label_index=0
+
+label_list=()
+beaitfy_labels=true
+
+NONE_TYPE=0
+MEMORY_TYPE=1
+PERFORMANCE_TYPE=2
+plot_type=$NONE_TYPE
+
+# R parameters
+Rtitle=""
+Rltitle=""
+Rout_file="plot.pdf"
+Rxlabel=""
+Rylabel=""
+Rydivider="1"
+Rymin=""
+Rymax=""
+Rxmin=""
+Rxmax=""
+
+set_memory_type() {
+  plot_type=$MEMORY_TYPE
+  Rxlabel=""
+  Rylabel="Resident Set Size [MB]"
+}
+
+set_performance_type() {
+  plot_type=$PERFORMANCE_TYPE
+  Rxlabel="Number of Cores [#]"
+  Rylabel="Time [s]"
+}
+
+usage() {
+  >&2 echo "usage: $0 PLOTTYPE [FILE1] [FILE2,LABEL1,LABEL2,...]... [OPTION]... [VAR=VALUE]...
+
+  PLOTTYPE: memory or performance
+  FILE:     path to a csv file
+  LABEL:    label (title of the column e.g. CAF)
+
+  Options:
+    --help              print this
+    --out=FILE          set filename for the pdf plot (default: $Rout_file)
+    --title=NAME        add a title to the plot (default: None)
+    --ltitle=NAME       add a title legend (default: None)
+    --xlabel=NAME       set label of x-axis (default: $Rxlabel)
+    --ylabel=NAME       set label of y-axis (default: $Rylabel)
+    --tlabel=N1,N2,..   set type labels (names of the graphs for the legend)
+    --ydivider=X        set devider for y-axis (default: $Rydivider)
+                          e.g. data represented in milliseconds can be 
+                          transformed to seconds with a ydivider of 1000.
+    --ylim=MIN,MAX      set limits of y-axis
+                          e.g ylim=0,10 or ylim=,10 or ylim=10
+    --xlim=MIN,MAX      set limits of x-axis (similar to ylim)
+
+  e.g.: $0 performance f2015.csv,CAF f2016,CAF1,CAF2 --tlabel=\"CAF 2015\",\"2016a\",\"2016b\"
+"
+  exit 0
+}
+
+extract_columns_from_file() {
+  file=$1; shift
+  if [ ! -f $file ]; then
+    >&2 echo "file <$file> not found"
+    return
+  fi
+  column_list=() #stores indexes of columns
+  # copy file header (cores, caf, caf_yerr, ..) to array header_list
+  IFS=',' read -ra header_list <<< "$(head -n 1 $file | sed 's/ //g')"
+  # convert wanted lables (string) to column (number)
+  if [ $# -eq 0 ]; then
+    # if no label is given the whole file is used
+    if [ $plot_type == $PERFORMANCE_TYPE ]; then
+      tmp_seq=$(seq 1 2 $((${#header_list[@]} - 2)))
+    else
+      tmp_seq=$(seq 0 $((${#header_list[@]} - 1)))
+    fi
+    for i in $tmp_seq; do
+      column_list+=($i)
+    done
+  else  
+    # iterate over all given labels for a specific file and compare it  to header_list 
+    while [ $# -ne 0 ]; do
+      column_found=false
+      for idx in ${!header_list[@]}; do
+        if [ "$1" == "${header_list[$idx]}" ]; then
+          column_list+=($idx)
+          column_found=true
+          break
+        fi 
+      done
+      if [ $column_found == false ]; then
+        >&2 echo "Label <$1> in file <$file> not found"    
+      fi
+      shift
+    done
+  fi
+  # add header to file (once) 
+  if [ $file_header_set == false ]; then
+    file_header_set=true
+    if [ $plot_type == $PERFORMANCE_TYPE ]; then
+      echo "xaes , yaes , err , type" > "$csv_tmp_file"
+    else
+      echo "yaes , type" > "$csv_tmp_file"
+    fi
+  fi
+  # add data to file
+  for i in ${column_list[@]}; do
+    label=${header_list[$i]}_${label_index}
+    label_list+=($label)
+    if [ $plot_type == $PERFORMANCE_TYPE ]; then
+      tail -n +2 $file | sed 's/ //g' | awk -F ',' "{print \$1 \" , \"  \$$(($i + 1)) \" , \" \$$(($i + 2)) \" , \\\"${label}\\\"\"}" >> "$csv_tmp_file"
+    else
+      tail -n +2 $file | sed 's/ //g' | awk -F ',' "\$$(($i + 1))!=\"\"{print \$$(($i + 1)) \" , \\\"${label}\\\"\"}" >> "$csv_tmp_file"
+    fi
+    label_index=$(($label_index + 1))
+  done
+}
+
+rename_labels_in_file() {
+  beaitfy_labels=false
+  IFS=',' read -ra new_label_list <<< "$1"
+  if [ ${#label_list[@]} -ne ${#new_label_list[@]} ]; then
+    >&2 echo "length of value of --tlabel differs from the number of used columns"    
+    return 0
+  fi
+  for idx in ${!label_list[@]}; do
+    if [ "$(uname)" == "Linux" ]; then
+      sed -i "s/${label_list[$idx]}/${new_label_list[$idx]}/g" "$csv_tmp_file"
+    elif [ "$(uname)" == "Darwin" ]; then #MacOs
+      sed -i "" "s/${label_list[$idx]}/${new_label_list[$idx]}/g" "$csv_tmp_file"
+    else
+      >&2 echo "Operating System not supported"
+      exit 1
+    fi
+  done
+}
+
+beautify_labels_if_possible() {
+  # remove the label_index of each label if the label name is unique
+  if [ $beaitfy_labels == true ]; then
+    for idx in ${!label_list[@]}; do
+      for cmp_idx in ${!label_list[@]}; do
+        if [ "$idx" != "$cmp_idx" ]; then 
+          # remove label_index and compare them
+          tmp_a=$(echo ${label_list[$idx]} | sed -r 's/_[0-9]+$//')
+          tmp_b=$(echo ${label_list[$cmp_idx]} | sed -r 's/_[0-9]+$//')
+          if [ "$tmp_a" == "$tmp_b" ]; then
+            # labels cannot be beautified as they are not unique
+            return 0 
+          fi
+        fi
+      done
+    done
+    if [ "$(uname)" == "Linux" ]; then
+      sed -i -r 's/_[0-9]+\"$/\"/g' $csv_tmp_file
+    elif [ "$(uname)" == "Darwin" ]; then #MacOs
+      sed -i "" -r 's/_[0-9]+\"$/\"/g' $csv_tmp_file
+    else
+      >&2 echo "Operating System not supported"
+      exit 1
+    fi
+  fi
+}
+
+set_axis_limits() {
+  axis=$1
+  IFS=',' read -ra min_max <<< "$2"
+  min=${min_max[0]}
+  max=${min_max[1]}
+  eval R${axis}min=${min}
+  eval R${axis}max=${max}
+}
+
+# parse arguments
+if [[ $# -lt 2 ]]; then
+  usage
+fi
+
+if [ "$1" == "memory" ]; then
+  set_memory_type
+elif [ "$1" == "performance" ]; then
+  set_performance_type
+else 
+  usage
+fi
+shift
+
+# iterate over all file-table set arguments 
+while [ $# -ne 0 ]; do
+  if [[ $1 == --* ]]; then
+    break
+  fi
+  IFS=',' read -ra LANG <<< "$1"
+  extract_columns_from_file "${LANG[@]}"
+  shift
+done
+
+# iterate over all options
+while [ $# -ne 0 ]; do
+  case "$1" in
+    -*=*) optarg=$(echo "$1" | sed 's/[-_a-zA-Z0-9]*=//' | sed 's/\"//g') ;;
+    *) optarg= ;;
+  esac
+  case "$1" in
+    --help)
+      usage
+      ;;
+    --title=*)
+      Rtitle="$optarg"
+      ;;
+    --ltitle=*)
+      Rltitle="$optarg"
+      ;;
+    --out=*)
+      Rout_file="$optarg"
+      ;;
+    --xlabel=*)
+      Rxlabel="$optarg"
+      ;;
+    --ylabel=*)
+      Rylabel="$optarg"
+      ;;
+    --ydivider=*)
+      Rydivider="$optarg"
+      ;;
+    --tlabel=*)
+      rename_labels_in_file "$optarg"
+      ;;
+    --ylim=*)
+      set_axis_limits "y" "$optarg"
+      ;;
+    --xlim=*)
+      set_axis_limits "x" "$optarg"
+      ;;
+  esac
+  shift
+done
+
+beautify_labels_if_possible 
+
+# concatenate all options
+Rscript_args="--csvfile \"$csv_tmp_file\" --out \"$Rout_file\""
+append_Rscript_args() {
+  Rvalue=R$1
+  if [ "${!Rvalue}" != "" ]; then
+    Rscript_args="$Rscript_args --$1 \"${!Rvalue}\""
+  fi
+}
+#if [ "$Rtitle" != "" ]; then
+  #Rscript_args="$Rscript_args --title \"$Rtitle\""
+#fi
+args="xlabel ylabel title ltitle ydivider ymin ymax xmin xmax"
+for arg in $args; do
+  append_Rscript_args $arg
+done
+
+# find R-scripts
+path_to_r_script="."
+# (a) Am I a real file (not symbolic) then it is assumed all R-scripts are in the same directory
+if ! [ -L "$0" ]; then
+  path_to_r_script=$(dirname "$0")
+fi
+# (b) Am I a symbolic link then follow the link to the real file and do (a)
+if [ -L "$0" ]; then
+  path_to_r_script=$(dirname $(readlink -f "$0"))
+fi
+
+if [ $plot_type == $PERFORMANCE_TYPE ]; then
+  eval "Rscript --vanilla ${path_to_r_script}/plot_performance.R $Rscript_args"
+else
+  eval "Rscript --vanilla ${path_to_r_script}/plot_memory.R $Rscript_args"
+fi
+

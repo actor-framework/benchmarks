@@ -7,3 +7,5 @@ src/salsa/*.java
 scripts/caf_run_benchmarks
 scripts/run
 *.swp
+src/erlang/bencherl/*.beam
+src/erlang/bencherl/*.dump
