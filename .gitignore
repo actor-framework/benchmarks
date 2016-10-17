@@ -6,3 +6,4 @@ charmrun
 src/salsa/*.java
 scripts/caf_run_benchmarks
 scripts/run
+*.swp
