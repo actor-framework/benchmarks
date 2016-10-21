@@ -162,7 +162,7 @@ pair<regex, map<string, size_t>> read_format(const char* format_str) {
   replace_all(fstr, "{X-VALUE}", "([0-9]+)");
   replace_all(fstr, "{X-LABEL}", "([a-zA-Z_]+)");
   replace_all(fstr, "{MEMORY_OR_RUNTIME}", "(runtime|memory_[0-9]+)");
-  replace_all(fstr, "{LABEL}", "([a-zA-Z]+)");
+  replace_all(fstr, "{LABEL}", "([a-zA-Z0-9]+)");
   replace_all(fstr, "{BENCHMARK}", "([a-zA-Z_]+)");
   regex rx{fstr};
   return make_pair(std::move(rx), std::move(mapping));
@@ -338,9 +338,11 @@ class application {
       tmp << left;
       size_t cols = 0;
       bool at_begin = true;
+      auto no_nice_name = m_nice_names.end();
       for (auto& kvp : samples) {
         auto& framework = kvp.first;
-        auto& nice_name = m_nice_names[framework];
+        auto iter = m_nice_names.find(framework);
+        auto& nice_name = (iter == no_nice_name) ? framework : iter->second;
         if (!at_begin) {
           tmp << ",";
         } else {

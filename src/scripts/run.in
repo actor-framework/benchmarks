@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# hard-coded defaults
+CAF_HOME=@CMAKE_HOME_DIRECTORY@
+CAF_BIN_PATH=$CAF_HOME/build/bin
+
 # max time before benchmark program gets killed
 max_runtime_sec=3600
 
@@ -17,13 +21,13 @@ foundry_home=/home/neverlord/actor-framework/benchmarks/actor_foundry
 classpath_foundry="$foundry_home/lib_src/lib/foundry-1.0.jar:$foundry_home/lib_src/classes"
 
 usage="\
-usage: $0 USERID BIN_PATH RUNTIME_FILE MEM_USAGE_FILE IMPL BENCH BENCH_ARGS
+usage: $0 USERID BIN_PATH RUNTIME_FILE MEM_USAGE_FILE LABEL BENCH BENCH_ARGS
 
   USERID:         ID of the user this benchmark should run as
   BIN_PATH:       path to CAF binaries
   RUNTIME_FILE:   output file for runtime
   MEM_USAGE_FILE: output file for memory consumption
-  IMPL:           (caf|scala|erlang|foundry|charm|salsa)
+  LABEL:           (caf|scala|erlang|foundry|charm|salsa)
   BENCH:          (mixed_case|actor_creation|mailbox_performance|mandelbrot)
 
 "
@@ -49,7 +53,7 @@ username="$1" ; userid=$(id -u $username) ; shift
 binpath="$1" ; shift
 runtime_out_file="$1" ; shift
 mem_usage_out_file="$1" ; shift
-impl="$1" ; shift
+label="$1" ; shift
 bench="$1" ; shift
 
 jvm_tuning="-Xmx10240M -Xms32M"
@@ -57,10 +61,7 @@ erl_cmd=$(which erl)
 
 salsa_cp=@CAF_SALSA_JAR@
 
-case "$impl" in
-  caf)
-    cmd="$binpath/$bench $@"
-    ;;
+case "$label" in
   charm)
     cmd="$binpath/charm_$bench +p $NumCores $@"
     ;;
@@ -80,14 +81,17 @@ case "$impl" in
   salsa)
     cmd="@CAF_JAVA_BIN@ $jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores ${bench} $@"
     ;;
-  *)
-    echo "invalid argument: $impl"; echo; echo "$usage"
-    exit 1
+  *) #CAF
+    cmd="$binpath/$bench $@"
     ;;
+  #*)
+    #echo "invalid argument: $label"; echo; echo "$usage"
+    #exit 1
+    #;;
 esac
 
 olddir=$PWD
-cd "$binpath"
+cd "$CAF_BIN_PATH"
 export JAVA_OPTS="-Xmx40960M"
 for trial in $(seq 1 $max_trials); do
   if ./caf_run_bench $userid $max_runtime_sec $mem_poll_interval_ms "$runtime_out_file" "$mem_usage_out_file" $cmd ; then
