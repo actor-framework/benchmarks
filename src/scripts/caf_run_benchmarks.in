@@ -1,17 +1,158 @@
 #!/bin/bash
 
+# hard-coded defaults
 CAF_HOME=@CMAKE_HOME_DIRECTORY@
-CAF_BINS=$CAF_HOME/build/bin
+BIN_PATH=$CAF_HOME/build/bin
 
-OUT_DIR=/local_data
+DEFAULT_MODE=true
 
-if [[ $# -ne 1 ]]; then
-  echo "usage ./caf_run_benchmarks USERID
-  USERID: ID of the user this benchmark should run as"
-  exit
+# language/framework settings
+RUN_CAF=false
+RUN_CHARM=false
+RUN_SCALA=false
+RUN_ERLANG=false
+
+# benchmark settings
+RUN_MIXED_CASE=false
+RUN_ACTOR_CREATION=false
+RUN_MAILBOX_PERFORMANCE=false
+
+BENCH_REPETITIONS=10
+# CPU core settings
+MIN_CORES=$(lscpu | grep -E "^Socket\(s\)" | grep -oE "[0-9]+")
+MAX_CORES=$(lscpu | grep -E "^CPU\(s\)" | grep -oE "[0-9]+")
+
+
+
+usage="\
+Usage: $0 default BENCH_USER OUT_DIR [OPTION]...
+       $0 custom  BENCH_USER OUT_DIR X_LABEL X_VALUE LABEL BIN_PATH BENCH BENCH_ARGS
+  
+  BENCH_USER: Name or ID of the user this benchmark should run as  
+  OUT_DIR:    Output directory for measurment files
+
+  X_LABEL:    Label of x-axis (musst match regex ^[a-zA-Z_]+$)
+  X_VALUE:    Value of the control variable
+  LABEL:      Benchmark topic (similar to --label, musst match regex ^[a-zA-Z0-9]+$, no underscore allowed!) 
+  BIN_PATH:   Folder of benchmark executables
+  BENCH:      Name of the benchmark executable (musst match regex ^[a-zA-Z_]+$)
+  BENCH_ARGS: Remainder of the arguments are passed to BENCH
+
+  Options:
+    --bin-path=PATH       set folder of benchmark executables 
+                          (current default $BIN_PATH)
+    --label=all|list      <all>  includes \"caf,charm,scala,erlang\"
+                          <list> defines a subset of <all>
+    --bench=all|list      <all>  includes \"mixed-case,actor-creation,
+                                         mailbox-performance\"
+                          <list> defines a subset of <all>
+    --min-cores=NUM       start at NUM cores (current default: ${MIN_CORES})
+    --max-cores=NUM       stop at NUM cores (current default: ${MAX_CORES})
+"
+
+# parse arguments
+if [[ $# -lt 3 ]]; then
+  echo "${usage}" 1>&2
+  exit 0
 fi
 
-CAF_BENCH_USER=$1
+if [ "$1" == "default" ]; then
+  DEFAULT_MODE=true 
+elif [ "$1" == "custom" ]; then
+  DEFAULT_MODE=false
+else
+  echo "${usage}" 1>&2
+  exit 1
+fi
+shift
+
+BENCH_USER="$1" ; shift
+OUT_DIR="$1" ; shift
+LABEL_STR=""
+BENCH_STR=""
+
+if [ "$DEFAULT_MODE" == "true" ]; then
+  while [ $# -ne 0 ]; do
+    case "$1" in
+      -*=*) optarg=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+      *) optarg= ;;
+    esac
+    case "$1" in
+      --help|-h)
+        echo "${usage}" 1>&2
+        exit 1
+        ;;
+      --bin-path=*)
+        BIN_PATH="$optarg"
+        ;;
+      --label=*)
+        IFS=',' read -ra LABEL <<< "$optarg"
+        for i in "${LABEL[@]}"; do
+          case "$i" in
+            "all") RUN_CAF=true; RUN_CHARM=true; RUN_SCALA=true; RUN_ERLANG=true ;; 
+            "caf") RUN_CAF=true ;;
+            "charm") RUN_CHARM=true ;;
+            "scala") RUN_SCALA=true ;;
+            "erlang") RUN_ERLANG=true ;;
+            *) echo "unknown label argument \"$i\""; exit 0 ;;
+          esac
+        done
+        ;;
+      --bench=*)
+        IFS=',' read -ra BENCH <<< "$optarg"
+        for i in "${BENCH[@]}"; do
+          case "$i" in
+            "all") RUN_MIXED_CASE=true; RUN_ACTOR_CREATION=true; RUN_MAILBOX_PERFORMANCE=true ;; 
+            "mixed-case") RUN_MIXED_CASE=true ;;
+            "actor-creation") RUN_ACTOR_CREATION=true ;;
+            "mailbox-performance") RUN_MAILBOX_PERFORMANCE=true ;;
+            *) echo "unknown bench argument \"$i\""; exit 0 ;;
+          esac
+        done
+        ;;
+      --min-cores=*) MIN_CORES=$optarg ;;
+      --max-cores=*) MAX_CORES=$optarg ;;
+    esac
+    shift
+  done
+
+  if $RUN_ERLANG ; then LABEL_STR="erlang $LABEL_STR" ; fi
+  if $RUN_SCALA ; then LABEL_STR="scala $LABEL_STR" ; fi
+  if $RUN_CHARM ; then LABEL_STR="charm $LABEL_STR" ; fi
+  if $RUN_CAF ; then LABEL_STR="caf $LABEL_STR" ; fi
+
+  if $RUN_MIXED_CASE ; then BENCH_STR="mixed_case" $BENCH_STR ; fi
+  if $RUN_ACTOR_CREATION ; then BENCH_STR="actor_creation $BENCH_STR" ; fi
+  if $RUN_MAILBOX_PERFORMANCE ; then BENCH_STR="mailbox_performance $BENCH_STR" ; fi
+fi
+
+
+if [ "$DEFAULT_MODE" == "false" ]; then
+  X_LABEL=$1 ; shift
+  if ! [[ $X_LABEL =~ ^[a-zA-Z_]+$ ]]; then
+    echo "X_LABEL <${X_LABEL}> does not match regex ^[a-zA-Z_]+$" 1>&2
+    exit 1
+  fi
+  X_VALUE=$1 ; shift
+  LABEL_STR=$1 ; shift
+  if ! [[ $LABEL_STR =~ ^[a-zA-Z0-9]+$ ]]; then
+    echo "LABEL <${LABEL_STR}> does not match regex ^[a-zA-Z0-9]+$" 1>&2
+    exit 1
+  fi
+  BIN_PATH=$1 ; shift
+  BENCH_STR=$1 ; shift
+  if ! [[ $BENCH_STR =~ ^[a-zA-Z_]+$ ]]; then
+    echo "BENCH <${BENCH_STR}> does not match regex ^[a-zA-Z_]+$" 1>&2
+    exit 1
+  fi
+  OWN_TEST_ARGS=$@ 
+fi
+
+# check authorization
+if [[ $(id -u) != 0 ]]; then
+  echo "you need to be root"
+  exit 0
+fi
 
 # arguments for all benchmarks
 mixed_case="100 100 1000 4"
@@ -19,31 +160,42 @@ actor_creation="20"
 mailbox_performance="100 1000000"
 mandelbrot="16000"
 
-MaxCores=$(lscpu | grep -E "^CPU\(s\)" | grep -oE "[0-9]+")
-NumCPUs=$(lscpu | grep -E "^Socket\(s\)" | grep -oE "[0-9]+")
-CoresPerCPU=$(echo "$MaxCores / $NumCPUs" | bc)
-
-for lang in @CAF_COMPILED_BENCHES@; do
-  if [ -d "${SALSA_HOME}" ]; then
-    echo "SALSA_HOME not set"
-    exit
-  fi
-  for NumCores in $(seq $NumCPUs $NumCPUs $MaxCores) ; do
-    $CAF_HOME/benchmarks/scripts/activate_cores $NumCores
-    fname=$(printf "%.2i_cores" $NumCores)
-    for bench in mixed_case actor_creation mailbox_performance ; do
-      echo "$lang: $bench @ $NumCores cores"
+run_bench() {
+  label=$1 ; shift
+  x_value_n_label=$1 ; shift
+  for bench in $BENCH_STR ; do
+    echo " Bench: $bench"
+    if [ "$DEFAULT_MODE" == "true" ]; then
       args=${!bench}
-      runtimes="$OUT_DIR/${fname}_runtime_${lang}_${bench}.txt"
-      for i in {1..10} ; do
-        memfile="$OUT_DIR/${fname}_memory_${i}_${lang}_${bench}.txt"
-        if [ -f "$memfile" ] ; then
-          echo "SKIP $lang $bench $i (mem file already exists)"
-        else
-          $CAF_HOME/benchmarks/scripts/run $CAF_BENCH_USER $CAF_BINS $runtimes $memfile $lang $bench $args
-        fi
-      done
+    else
+      args=$OWN_TEST_ARGS
+    fi
+    runtimes="$OUT_DIR/${x_value_n_label}_runtime_${label}_${bench}.txt"
+    for i in $(seq 1 $BENCH_REPETITIONS) ; do
+      memfile="$OUT_DIR/${x_value_n_label}_memory_${i}_${label}_${bench}.txt"
+      if [ -f "$memfile" ] ; then
+        echo "SKIP $label $bench $i (mem file already exists)"
+      else
+        printf "$i "
+        $CAF_HOME/benchmarks/scripts/run $BENCH_USER $BIN_PATH $runtimes $memfile $label $bench $args >> /dev/null
+      fi
     done
+    #delete current line and move cursor to the beginning
+    printf "\033[2K\r" 
   done
-done
+}
 
+for label in $LABEL_STR; do
+  echo "-- Label: $label"
+  if [ "$DEFAULT_MODE" == "true" ]; then
+    for NumCores in $(seq $MIN_CORES $MIN_CORES $MAX_CORES); do
+      $CAF_HOME/benchmarks/scripts/activate_cores $num_cores >> /dev/null
+      echo "Cores: $NumCores"
+      x_value=$(printf "%.2i" NumCores)
+      x_label="cores"
+      run_bench "$label" "${x_value}_${x_label}"
+    done
+  else
+    run_bench "$label" "${X_VALUE}_${X_LABEL}"
+  fi
+done
