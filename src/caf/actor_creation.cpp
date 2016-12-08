@@ -86,6 +86,7 @@ int main(int argc, char** argv) {
   s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   actor_system_config cfg;
   actor_system system{cfg};
+  cfg.parse(argc, argv, "caf-application.ini");
   scoped_actor self{system};
   anon_send(system.spawn<lazy_init>(testee, self), spread_atom::value, s_num);
 }
