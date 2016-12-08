@@ -180,6 +180,7 @@ int main(int argc, char** argv) {
   auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
   auto repetitions = atoi(argv[4]);
   actor_system_config cfg;
+  cfg.parse(argc, argv, "caf-application.ini");
   cfg.add_message_type<factors>("factors");
   actor_system system{cfg};
   auto sv = system.spawn<supervisor, lazy_init>(num_rings
@@ -187,3 +188,5 @@ int main(int argc, char** argv) {
   for (int i = 0; i < num_rings; ++i)
     system.spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
 }
+
+
