@@ -189,7 +189,7 @@ for label in $LABEL_STR; do
   echo "-- Label: $label"
   if [ "$DEFAULT_MODE" = true ]; then
     for NumCores in $(seq $MIN_CORES $MIN_CORES $MAX_CORES); do
-      $CAF_HOME/benchmarks/scripts/activate_cores $Num_cores >> /dev/null
+      $CAF_HOME/benchmarks/scripts/activate_cores $NumCores >> /dev/null
       echo "Cores: $NumCores"
       x_value=$(printf "%.2i" $NumCores)
       x_label="cores"
