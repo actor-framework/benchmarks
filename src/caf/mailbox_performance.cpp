@@ -69,8 +69,8 @@ int usage() {
 void run(int argc, char** argv, uint64_t num_sender, uint64_t num_msgs) {
   auto total = num_sender * num_msgs;
   actor_system_config cfg;
-  actor_system system{cfg};
   cfg.parse(argc, argv, "caf-application.ini");
+  actor_system system{cfg};
   auto testee = system.spawn<receiver>(total);
   for (uint64_t i = 0; i < num_sender; ++i)
     system.spawn(sender, testee, num_msgs);
