@@ -120,89 +120,100 @@ void memrecord(blocking_actor* self, int poll_interval, std::ostream* out_ptr) {
   );
 }
 
-void usage() {
-  cout << "usage: caf_run_bench USERID MAX_RUNTIME_IN_SEC "
-          "MEM_POLL_INTERVAL_IN_MS RUNTIME_OUT_FILE MEM_OUT_FILE "
-          "PROGRAM ARGS..."
-       << endl;
-  exit(1);
-}
+class my_config : public actor_system_config {
+public:
+  int userid = 1000;
+  int max_runtime = 3600;
+  int mem_poll_interval = 50;
+  string runtime_out_fname;
+  string mem_out_fname;
+  string bench;
 
-int rd_int(const char* cstr) {
-  return atoi(cstr);
-}
-
-int main(int argc, char** argv) {
-  if (argc < 7) {
-    usage();
+  my_config() {
+    opt_group{custom_options_, "global"}
+      .add(userid, "uid, u", "set user id")
+      .add(max_runtime, "max-runtime", "set maximum runtime (in sec)")
+      .add(mem_poll_interval, "mem-poll-interval",
+           "set memory poll intervall (in ms)")
+      .add(runtime_out_fname, "runtime-out", "set runtime filename")
+      .add(mem_out_fname, "mem-out", "set memory filename")
+      .add(bench, "bench", "set executable of the benchmark + plus args");
   }
-  uid_t userid = static_cast<uid_t>(rd_int(argv[1]));
-  int max_runtime = rd_int(argv[2]);
-  int poll_interval = rd_int(argv[3]);
-  string runtime_out_fname = argv[4];
-  string mem_out_fname = argv[5];
-  std::fstream runtime_out{runtime_out_fname, ios_base::out | ios_base::app};
-  std::fstream mem_out{mem_out_fname, ios_base::out};
+};
+
+void init_fstream(const string& fname, std::fstream& fs) {
+  if (!fname.empty()) {
+    fs.open(fname, ios_base::out | ios_base::app);
+    if (!fs) {
+      cerr << "unable to open file for runtime output: " << fname << endl;
+      exit(1);
+    }
+  }
+}
+
+int caf_main(actor_system& system, const my_config& cfg) {
+  std::fstream runtime_out;
+  std::fstream mem_out;
+  init_fstream(cfg.runtime_out_fname, runtime_out);
+  init_fstream(cfg.mem_out_fname, mem_out);
   std::ostringstream mem_out_buf;
-  if (!runtime_out) {
-    cerr << "unable to open file for runtime output: "
-         << runtime_out_fname << endl;
-    return 1;
-  }
-  if (!mem_out) {
-    cerr << "unable to open file for memory output: " << mem_out_fname << endl;
-    return 1;
-  }
   // start background workers
-  actor_system_config cfg;
-  actor_system system{cfg};
-  auto dog = system.spawn<detached>(watchdog, max_runtime);
-  auto rec = system.spawn<detached>(memrecord, poll_interval, &mem_out_buf);
-  cout << "fork into " << argv[6] << endl;
+  auto dog = system.spawn<detached>(watchdog, cfg.max_runtime);
+  actor mem_rec;
+  if (mem_out)
+    mem_rec = system.spawn<detached>(memrecord, cfg.mem_poll_interval, &mem_out_buf);
+  cout << "fork into " << cfg.bench << endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
-    fprintf(stderr, "fork failed");
+    cerr << "fork failed" << endl,
     abort();
   }
   s_start = chrono::system_clock::now();
   if (child_pid == 0) {
-    if (setuid(userid) != 0) {
-      cerr << "could not set userid to " << userid << endl;
+    if (setuid(cfg.userid) != 0) {
+      cerr << "could not set userid to " << cfg.userid << endl;
       exit(1);
     }
     // make sure $HOME is set properly (evaluated by Erlang)
-    auto pw = getpwuid(userid);
+    auto pw = getpwuid(cfg.userid);
     std::string env_cmd = "HOME=";
     env_cmd += pw->pw_dir;
     if (putenv(&env_cmd[0]) != 0) {
       cerr << "could net set HOME to " << pw->pw_dir << endl;
       exit(1);
     }
-    // skip path to app, userid, max runtime, and poll interval
-    auto first = argv + 6;
-    auto last = first + argc;
     vector<char*> arr;
-    copy(first, last, back_inserter(arr));
-    arr.push_back(nullptr);
-    execv(*first, arr.data());
+    arr.emplace_back(const_cast<char*>(cfg.bench.c_str()));
+    for (size_t i = 0; i < cfg.args_remainder.size(); ++i) {
+      arr.emplace_back(
+        const_cast<char*>(cfg.args_remainder.get_as<string>(i).c_str()));
+    }
+    arr.emplace_back(nullptr);
+    execv(cfg.bench.c_str(), arr.data());
     // should be unreachable
-    fprintf(stderr, "execv failed");
+    cerr << "execv failed" << endl;
     abort();
   }
   auto msg = make_message(go_atom::value, child_pid);
   anon_send(dog, msg);
-  anon_send(rec, msg);
+  if (mem_out) 
+    anon_send(mem_rec, msg);
   int child_exit_status = 0;
   wait(&child_exit_status);
   auto duration = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start);
   anon_send_exit(dog, exit_reason::user_shutdown);
-  anon_send_exit(rec, exit_reason::user_shutdown);
+  if (mem_out) 
+    anon_send_exit(mem_rec, exit_reason::user_shutdown);
   cout << "exit status: " << child_exit_status << endl;
   cout << "program did run for " << duration.count() << "ms" << endl;
   system.await_all_actors_done();
   if (child_exit_status == 0) {
-    runtime_out << duration.count() << endl;
-    mem_out << mem_out_buf.str() << flush;
+    if (runtime_out)
+      runtime_out << duration.count() << endl;
+    if (mem_out)
+      mem_out << mem_out_buf.str() << flush;
   }
   return child_exit_status;
 }
+
+CAF_MAIN();

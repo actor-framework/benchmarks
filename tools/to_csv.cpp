@@ -160,10 +160,10 @@ pair<regex, map<string, size_t>> read_format(const char* format_str) {
   using caf::replace_all;
   std::string fstr = format_str;
   replace_all(fstr, "{X-VALUE}", "([0-9]+)");
-  replace_all(fstr, "{X-LABEL}", "([a-zA-Z_]+)");
+  replace_all(fstr, "{X-LABEL}", "([a-zA-Z_\\-]+)");
   replace_all(fstr, "{MEMORY_OR_RUNTIME}", "(runtime|memory_[0-9]+)");
-  replace_all(fstr, "{LABEL}", "([a-zA-Z0-9]+)");
-  replace_all(fstr, "{BENCHMARK}", "([a-zA-Z_]+)");
+  replace_all(fstr, "{LABEL}", "([a-zA-Z0-9\\-]+)");
+  replace_all(fstr, "{BENCHMARK}", "([a-zA-Z_\\-]+)");
   regex rx{fstr};
   return make_pair(std::move(rx), std::move(mapping));
 }
@@ -256,8 +256,7 @@ class application {
         } else {
           auto& out = samples[first->framework][first->num_units];
           for (auto& row : vals) {
-            // our raw files have milliseconds, we need convert to seconds
-            out.push_back(row[0] / 1000.0);
+            out.push_back(row[0]);
           }
         }
       }
@@ -327,9 +326,7 @@ class application {
         if (!vals.empty()) {
           auto& out = samples[first->framework];
           for (auto& row : vals) {
-            // first value in raw files is the timestamp (ignored),
-            // the second value is RSS in kB (we convert to mB)
-            out.push_back(row[1] / 1024.0);
+            out.push_back(row[1]);
           }
         }
       }

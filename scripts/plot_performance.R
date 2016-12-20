@@ -14,13 +14,17 @@ option_list <- list(
 	make_option(c("--xlabel"), type="character", default="Number of Cores [#]", 
               help="set label of x-axis", metavar="character"),
 	make_option(c("--ylabel"), type="character", default="Time [s]", 
-              help="set label of y-axis", metavar="character")
+              help="set label of y-axis", metavar="character"),
+	make_option(c("--ydivider"), type="double", default=1, 
+              help="set divider for y-axis", metavar="double")
 ); 
  
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
 data <- read.csv(opt$csvfile)
+data$y_aes <- data$y_aes / opt$ydivider
+data$err <- data$err / opt$ydivider
 
 plot <- ggplot (data, aes(x=x_aes, y=y_aes)) +
 

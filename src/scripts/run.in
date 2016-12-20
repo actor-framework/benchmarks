@@ -4,11 +4,6 @@
 CAF_HOME=@CMAKE_HOME_DIRECTORY@
 CAF_BIN_PATH=$CAF_HOME/build/bin
 
-# max time before benchmark program gets killed
-max_runtime_sec=3600
-
-# interval in which memory consumption is recorded
-mem_poll_interval_ms=50
 
 # maximum number of trials before a run gets aborted
 max_trials=3
@@ -21,14 +16,24 @@ foundry_home=/home/neverlord/actor-framework/benchmarks/actor_foundry
 classpath_foundry="$foundry_home/lib_src/lib/foundry-1.0.jar:$foundry_home/lib_src/classes"
 
 usage="\
-usage: $0 USERID BIN_PATH RUNTIME_FILE MEM_USAGE_FILE LABEL BENCH BENCH_ARGS
+usage: $0 USERID 
+          BIN_PATH 
+          RUNTIME_FILE 
+          MEM_USAGE_FILE 
+          NUMA_LOCAL_FILE
+          NUMA_OTHER__FILE
+          LABEL 
+          BENCH 
+          BENCH_ARGS
 
-  USERID:         ID of the user this benchmark should run as
-  BIN_PATH:       path to CAF binaries
-  RUNTIME_FILE:   output file for runtime
-  MEM_USAGE_FILE: output file for memory consumption
-  LABEL:           (caf|scala|erlang|foundry|charm|salsa)
-  BENCH:          (mixed_case|actor_creation|mailbox_performance|mandelbrot)
+  USERID:           ID of the user this benchmark should run as
+  BIN_PATH:         path to CAF binaries
+  RUNTIME_FILE:     output file for runtime
+  MEM_USAGE_FILE:   output file for memory consumption
+  NUMA_LOCAL_FILE:  output file for NUMA local memory access counter 
+  NUMA_OTHER__FILE: output file for NUMA local memory access counter 
+  LABEL:            (caf|scala|erlang|foundry|charm|salsa)
+  BENCH:            (mixed_case|actor_creation|mailbox_performance|mandelbrot)
 
 "
 
@@ -49,10 +54,13 @@ else
 fi
 
 cmd=""
+args=""
 username="$1" ; userid=$(id -u $username) ; shift
 binpath="$1" ; shift
 runtime_out_file="$1" ; shift
 mem_usage_out_file="$1" ; shift
+numa_local_out_file="$1" ; shift
+numa_other_out_file="$1" ; shift
 label="$1" ; shift
 bench="$1" ; shift
 
@@ -63,38 +71,40 @@ salsa_cp=@CAF_SALSA_JAR@
 
 case "$label" in
   charm)
-    cmd="$binpath/charm_$bench +p $NumCores $@"
+    cmd="$binpath/charm_$bench"
+    args="+p $NumCores $@"
     ;;
   scala)
     scala_lib="$scala_home/lib"
     scala_tuning="-Xbootclasspath/a:$scala_lib/akka-actors.jar:$scala_lib/jline.jar:$scala_lib/scala-actors-migration.jar:$scala_lib/scala-actors.jar:$scala_lib/scala-compiler.jar:$scala_lib/scala-library.jar:$scala_lib/scala-reflect.jar:$scala_lib/scala-swing.jar:$scala_lib/scalap.jar:$scala_lib/typesafe-config.jar -classpath "" -Dscala.home=$scala_home -Dscala.usejavacp=true scala.tools.nsc.MainGenericRunner"
-    cmd="@CAF_JAVA_BIN@ $jvm_tuning $scala_tuning org.caf.scala.$bench $@"
+    cmd="@CAF_JAVA_BIN@"
+    args="$jvm_tuning $scala_tuning org.caf.scala.$bench $@"
     ;;
   erlang)
-    cmd="$erl_cmd -noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
+    cmd="$erl_cmd"
+    args="-noshell -noinput +P 20000000 -smp enable +S $NumCores:$NumCores -setcookie abc123 -sname benchmark -pa erlang -s $bench start $@ -s init stop"
     ;;
   foundry)
     modified_args=$(echo "_$@" | tr ' ' _)
     echo "modified_args = $modified_args"
-    cmd="@CAF_JAVA_BIN@ -cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
+    cmd="@CAF_JAVA_BIN@"
+    args="-cp $classpath_foundry osl.foundry.FoundryStart osl.examples.caf_benches.$bench boot $modified_args"
     ;;
   salsa)
-    cmd="@CAF_JAVA_BIN@ $jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores ${bench} $@"
+    cmd="@CAF_JAVA_BIN@"
+    args="$jvm_tuning -cp $salsa_cp:$binpath -Dnstages=$NumCores ${bench} $@"
     ;;
   *) #CAF
-    cmd="$binpath/$bench $@"
+    cmd="$binpath/$bench"
+    args="$@"
     ;;
-  #*)
-    #echo "invalid argument: $label"; echo; echo "$usage"
-    #exit 1
-    #;;
 esac
 
 olddir=$PWD
 cd "$CAF_BIN_PATH"
 export JAVA_OPTS="-Xmx40960M"
 for trial in $(seq 1 $max_trials); do
-  if ./caf_run_bench $userid $max_runtime_sec $mem_poll_interval_ms "$runtime_out_file" "$mem_usage_out_file" $cmd ; then
+  if ./caf_run_bench --uid=$userid --runtime-out="$runtime_out_file" --mem-out="$mem_usage_out_file" --bench="$cmd" -- $args ; then
     cd "$olddir"
     exit 0
   fi

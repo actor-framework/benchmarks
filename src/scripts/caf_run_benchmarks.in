@@ -129,20 +129,20 @@ fi
 
 if [ "$DEFAULT_MODE" = false ]; then
   X_LABEL=$1 ; shift
-  if ! [[ $X_LABEL =~ ^[a-zA-Z_]+$ ]]; then
-    echo "X_LABEL <${X_LABEL}> does not match regex ^[a-zA-Z_]+$" 1>&2
+  if ! [[ $X_LABEL =~ ^[a-zA-Z_-]+$ ]]; then
+    echo "X_LABEL <${X_LABEL}> does not match regex ^[a-zA-Z_-]+$" 1>&2
     exit 1
   fi
   X_VALUE=$1 ; shift
   LABEL_STR=$1 ; shift
-  if ! [[ $LABEL_STR =~ ^[a-zA-Z0-9]+$ ]]; then
-    echo "LABEL <${LABEL_STR}> does not match regex ^[a-zA-Z0-9]+$" 1>&2
+  if ! [[ $LABEL_STR =~ ^[a-zA-Z0-9-]+$ ]]; then
+    echo "LABEL <${LABEL_STR}> does not match regex ^[a-zA-Z0-9-]+$" 1>&2
     exit 1
   fi
   BIN_PATH=$1 ; shift
   BENCH_STR=$1 ; shift
-  if ! [[ $BENCH_STR =~ ^[a-zA-Z_]+$ ]]; then
-    echo "BENCH <${BENCH_STR}> does not match regex ^[a-zA-Z_]+$" 1>&2
+  if ! [[ $BENCH_STR =~ ^[a-zA-Z_-]+$ ]]; then
+    echo "BENCH <${BENCH_STR}> does not match regex ^[a-zA-Z_-]+$" 1>&2
     exit 1
   fi
   OWN_TEST_ARGS=$@ 
@@ -170,9 +170,9 @@ run_bench() {
     else
       args=$OWN_TEST_ARGS
     fi
-    runtimes="$OUT_DIR/${x_value_n_label}_runtime_${label}_${bench}.txt"
+    runtimes="$OUT_DIR/${x_value_n_label}_runtime_${label}-ms_${bench}.txt"
     for i in $(seq 1 $BENCH_REPETITIONS) ; do
-      memfile="$OUT_DIR/${x_value_n_label}_memory_${i}_${label}_${bench}.txt"
+      memfile="$OUT_DIR/${x_value_n_label}_memory_${i}_${label}-kB_${bench}.txt"
       if [ -f "$memfile" ] ; then
         echo "SKIP $label $bench $i (mem file already exists)"
       else

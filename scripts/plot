@@ -20,6 +20,7 @@ Rltitle=""
 Rout_file="plot.pdf"
 Rxlabel=""
 Rylabel=""
+Rydivider="1"
 
 set_memory_type() {
   plot_type=$MEMORY_TYPE
@@ -48,6 +49,9 @@ usage() {
     --xlabel=NAME       set label of x-axis (default: $Rxlabel)
     --ylabel=NAME       set label of y-axis (default: $Rylabel)
     --tlabel=N1,N2,..   set type labels (names of the graphs for the legend)
+    --ydivider=X        set devider for y-axis (default: $Rydivider)
+                          e.g. data represented in milliseconds can be 
+                          transformed to seconds with a ydivider of 1000.
 
   e.g.: $0 performance f2015.csv,CAF f2016,CAF1,CAF2 --tlabel=\"CAF 2015\",\"2016a\",\"2016b\"
 "
@@ -194,6 +198,9 @@ while [ $# -ne 0 ]; do
     --ylabel=*)
       Rylabel="$optarg"
       ;;
+    --ydivider=*)
+      Rydivider="$optarg"
+      ;;
     --tlabel=*)
       rename_labels_in_file "$optarg"
       ;;
@@ -215,6 +222,9 @@ if [ "$Rtitle" != "" ]; then
 fi
 if [ "$Rltitle" != "" ]; then
   Rscript_args="$Rscript_args --ltitle \"$Rltitle\""
+fi
+if [ "$Rydivider" != "" ]; then
+  Rscript_args="$Rscript_args --ydivider $Rydivider"
 fi
 
 if [ $plot_type == $PERFORMANCE_TYPE ]; then
