@@ -120,6 +120,8 @@ void memrecord(blocking_actor* self, int poll_interval, std::ostream* out_ptr) {
   );
 }
 
+namespace {
+
 class my_config : public actor_system_config {
 public:
   int userid = 1000;
@@ -170,12 +172,12 @@ int caf_main(actor_system& system, const my_config& cfg) {
   }
   s_start = chrono::system_clock::now();
   if (child_pid == 0) {
-    if (setuid(cfg.userid) != 0) {
+    if (setuid(static_cast<uid_t>(cfg.userid)) != 0) {
       cerr << "could not set userid to " << cfg.userid << endl;
       exit(1);
     }
     // make sure $HOME is set properly (evaluated by Erlang)
-    auto pw = getpwuid(cfg.userid);
+    auto pw = getpwuid(static_cast<uid_t>(cfg.userid));
     std::string env_cmd = "HOME=";
     env_cmd += pw->pw_dir;
     if (putenv(&env_cmd[0]) != 0) {
@@ -215,5 +217,7 @@ int caf_main(actor_system& system, const my_config& cfg) {
   }
   return child_exit_status;
 }
+
+} // namespace <anonymous>
 
 CAF_MAIN();
