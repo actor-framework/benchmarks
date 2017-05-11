@@ -243,10 +243,24 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
     add_xxx_benchmark(ERLANG erlang ${name} erl beam
                       "${EXECUTABLE_OUTPUT_PATH}" ${ARGN})
   endmacro()
+  macro(add_erlang_bencherl_benchmark name)
+    add_xxx_benchmark(ERLANG erlang/bencherl ${name} erl beam
+                      "${EXECUTABLE_OUTPUT_PATH}" ${ARGN})
+  endmacro()
   add_erlang_benchmark(actor_creation)
   add_erlang_benchmark(mailbox_performance)
   add_erlang_benchmark(mixed_case)
   add_erlang_benchmark(mandelbrot)
+  add_erlang_bencherl_benchmark(bencherl_01_bang)
+  add_erlang_bencherl_benchmark(bencherl_02_big)
+  add_erlang_bencherl_benchmark(bencherl_03_ehb)
+  add_erlang_bencherl_benchmark(bencherl_05_genstress)
+  add_erlang_bencherl_benchmark(bencherl_06_mbrot)
+  add_erlang_bencherl_benchmark(bencherl_08_parallel)
+  add_erlang_bencherl_benchmark(bencherl_10_ran)
+  add_erlang_bencherl_benchmark(bencherl_11_serialmsg)
+  add_erlang_bencherl_benchmark(bencherl_12_timer_wheel)
+
   add_custom_target(erlang_benchmarks
                     SOURCES ${CAF_ERLANG_SRC_FILES}
                     DEPENDS ${CAF_ERLANG_OUT_FILES})
@@ -320,11 +334,38 @@ endif()
 #                                     CAF                                      #
 ################################################################################
 
+set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+include_directories("${INCLUDE_DIR}")
+
 # add targets for CAF benchmarks
+macro(add_benchmark name path)
+  if("${ARGN}" STREQUAL "")
+    set(new_name ${name})
+  else()
+    string(REPLACE ";" "_" post_fix "${ARGN}")
+    string(TOLOWER ${post_fix} post_fix)
+    set(new_name "${name}_${post_fix}")
+  endif()
+  add_executable(${new_name} ${path})
+  target_link_libraries(${new_name} ${CAF_LIBRARIES} ${LD_FLAGS})
+  target_compile_definitions(${new_name} PRIVATE ${ARGN})
+  add_dependencies(all_benchmarks ${new_name})
+endmacro()
+
 macro(add_caf_benchmark name)
-  add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/${name}.cpp)
-  target_link_libraries(${name} ${CAF_LIBRARIES} ${LD_FLAGS})
-  add_dependencies(all_benchmarks ${name})
+  add_benchmark(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/${name}.cpp ${ARGN})
+endmacro()
+
+macro(add_caf_savina_benchmark name)
+  add_benchmark(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/savina/${name}.cpp ${ARGN})
+endmacro()
+
+macro(add_caf_numa_benchmark name)
+  add_benchmark(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/numa/${name}.cpp ${ARGN})
+endmacro()
+
+macro(add_caf_bencherl_benchmark name)
+  add_benchmark(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/bencherl/${name}.cpp ${ARGN})
 endmacro()
 
 add_caf_benchmark(actor_creation)
@@ -336,6 +377,58 @@ add_caf_benchmark(micro)
 add_caf_benchmark(matrix)
 add_caf_benchmark(matching)
 add_caf_benchmark(scheduling)
+
+add_caf_savina_benchmark(savina_01_pingpong)
+add_caf_savina_benchmark(savina_02_count)
+add_caf_savina_benchmark(savina_03_fjthrput)
+add_caf_savina_benchmark(savina_04_fjcreate)
+add_caf_savina_benchmark(savina_05_threadring)
+add_caf_savina_benchmark(savina_06_chameneos)
+add_caf_savina_benchmark(savina_07_big)
+add_caf_savina_benchmark(savina_08_concdict)
+add_caf_savina_benchmark(savina_09_concsll)
+add_caf_savina_benchmark(savina_10_bndbuffer)
+add_caf_savina_benchmark(savina_11_philosopher)
+#add_caf_savina_benchmark(savina_12_barber) bench uses busy waiting
+#add_caf_savina_benchmark(savina_13_cigsmok) bench uses busy waiting
+add_caf_savina_benchmark(savina_14_logmap REQUEST_AWAIT INFINITE)
+add_caf_savina_benchmark(savina_14_logmap REQUEST_AWAIT HIGH_TIMEOUT)
+add_caf_savina_benchmark(savina_14_logmap BECOME_UNBECOME_SLOW)
+add_caf_savina_benchmark(savina_14_logmap BECOME_UNBECOME_FAST)
+add_caf_savina_benchmark(savina_15_banking REQUEST_AWAIT INFINITE)
+add_caf_savina_benchmark(savina_15_banking REQUEST_AWAIT HIGH_TIMEOUT)
+add_caf_savina_benchmark(savina_15_banking REQUEST_THEN INFINITE)
+add_caf_savina_benchmark(savina_15_banking REQUEST_THEN HIGH_TIMEOUT)
+add_caf_savina_benchmark(savina_15_banking BECOME_UNBECOME_SLOW)
+add_caf_savina_benchmark(savina_15_banking BECOME_UNBECOME_FAST)
+add_caf_savina_benchmark(savina_16_radixsort)
+#add_caf_savina_benchmark(savina_17_filterbank) savina implementation is buggy 
+add_caf_savina_benchmark(savina_18_sieve)
+#add_caf_savina_benchmark(savina_19_uct) bench uses busy waiting
+add_caf_savina_benchmark(savina_20_facloc)
+add_caf_savina_benchmark(savina_21_trapezoid)
+#add_caf_savina_benchmark(savina_22_piprecision) bench uses BigDecimal
+add_caf_savina_benchmark(savina_23_recmatmul)
+add_caf_savina_benchmark(savina_24_quicksort)
+add_caf_savina_benchmark(savina_25_apsp)
+#add_caf_savina_benchmark(savina_26_sor) savina implementation is buggy
+#add_caf_savina_benchmark(savina_27_astar) bench uses busy waiting
+add_caf_savina_benchmark(savina_28_nqueenk)
+add_caf_savina_benchmark(savina_29_fib)
+add_caf_savina_benchmark(savina_30_bitonicsort)
+
+add_caf_numa_benchmark(numa_matrix_search)
+
+add_caf_bencherl_benchmark(bencherl_01_bang)
+add_caf_bencherl_benchmark(bencherl_02_big)
+add_caf_bencherl_benchmark(bencherl_03_ehb)
+add_caf_bencherl_benchmark(bencherl_05_genstress)
+add_caf_bencherl_benchmark(bencherl_06_mbrot)
+add_caf_bencherl_benchmark(bencherl_08_parallel)
+add_caf_bencherl_benchmark(bencherl_10_ran)
+add_caf_bencherl_benchmark(bencherl_11_serialmsg)
+add_caf_bencherl_benchmark(bencherl_12_timer_wheel)
+
 set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
 
 
