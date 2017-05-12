@@ -39,8 +39,6 @@ struct send_pong_msg {
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(send_pong_msg);
 
 behavior ping_actor(stateful_actor<int>* self, int count, actor pong) {
-  aout(self) << "ping current execution unit: " << self->to_string_current_eu() << std::endl;
-  aout(self) << "ping home execution unit: " << self->to_string_home_eu() << std::endl;
   self->state = count;
   return {
     [=](start_msg_atom) {
@@ -63,8 +61,6 @@ behavior ping_actor(stateful_actor<int>* self, int count, actor pong) {
 }
 
 behavior pong_actor(stateful_actor<int>* self) {
-  aout(self) << "pong current execution unit: " << self->to_string_current_eu() << std::endl;
-  aout(self) << "pong home execution unit: " << self->to_string_home_eu() << std::endl;
   self->state = 0;
   return {
     [=](send_ping_msg& msg) { 
@@ -87,18 +83,14 @@ public:
   }
 };
 
-//void starter_actor(event_based_actor* self, const config* cfg) {
-  //cout << "starter execution unit: " << self->to_string_home_eu() << std::endl;
-  //auto pong = self->spawn(pong_actor);
-  //auto ping = self->spawn(ping_actor, cfg->n, pong);
-  //anon_send(ping, start_msg_atom::value);
-//}
+void starter_actor(event_based_actor* self, const config* cfg) {
+  auto pong = self->spawn(pong_actor);
+  auto ping = self->spawn(ping_actor, cfg->n, pong);
+  self->send(ping, start_msg_atom::value);
+}
 
 void caf_main(actor_system& system, const config& cfg) {
-  //system.spawn(starter_actor, &cfg);
-  auto pong = system.spawn(pong_actor);
-  auto ping = system.spawn(ping_actor, cfg.n, pong);
-  anon_send(ping, start_msg_atom::value);
+  system.spawn(starter_actor, &cfg);
 }
 
 CAF_MAIN()

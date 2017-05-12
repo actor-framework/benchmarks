@@ -89,18 +89,22 @@ public:
   }
 };
 
-void caf_main(actor_system& system, const config& cfg) {
-  auto num_actors_in_ring = cfg.n;
+void starter_actor(event_based_actor* self, const config* cfg) {
+  auto num_actors_in_ring = cfg->n;
   vector<actor> ring_actors;
   ring_actors.reserve(num_actors_in_ring);
   for (int i = 0; i < num_actors_in_ring; ++i) {
-    ring_actors.emplace_back(system.spawn(thread_ring_actor, i, num_actors_in_ring));
+    ring_actors.emplace_back(self->spawn(thread_ring_actor, i, num_actors_in_ring));
   }
   for (size_t i = 0; i < ring_actors.size(); ++i) {
     auto next_actor = ring_actors[(i + 1) % num_actors_in_ring] ;
-    anon_send(ring_actors[i], data_message{next_actor});
+    self->send(ring_actors[i], data_message{next_actor});
   }
-  anon_send(ring_actors[0], ping_message{cfg.r});
+  self->send(ring_actors[0], ping_message{cfg->r});
+}
+
+void caf_main(actor_system& system, const config& cfg) {
+  system.spawn(starter_actor, &cfg);
 }
 
 CAF_MAIN()
