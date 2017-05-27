@@ -339,6 +339,7 @@ add_caf_benchmark(micro)
 add_caf_benchmark(matrix)
 add_caf_benchmark(matching)
 add_caf_benchmark(scheduling)
+add_caf_benchmark(simple_streaming)
 set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
 
 
