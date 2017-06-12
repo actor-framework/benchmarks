@@ -17,9 +17,11 @@
 
 CAF_PUSH_WARNINGS
 #include <boost/math/distributions/students_t.hpp>
+#include <boost/filesystem.hpp>
 CAF_POP_WARNINGS
 
 using namespace std;
+using path = boost::filesystem::path;
 
 struct variance_plus {
   double mean;
@@ -72,7 +74,7 @@ enum benchmark_file_type {
 };
 
 struct benchmark_file {
-  string path;
+  path file;
   size_t num_units;
   benchmark_file_type type;
   string framework;
@@ -190,9 +192,10 @@ class application {
     m_empty_field.assign(static_cast<size_t>(m_field_width), ' ');
   }
   using iterator = vector<benchmark_file>::iterator;
-  void run(vector<string> fnames) {
+  void run(vector<path> files) {
     // parse file names and remove invalid files
-    auto parse_fname = [&](string& fname) -> benchmark_file {
+    auto parse_fname = [&](path& file) -> benchmark_file {
+      string fname = file.filename().string();
       benchmark_file res;
       smatch rxres;
       if (regex_match(fname, rxres, m_fname_rx) && rxres.size() == 6) {
@@ -203,35 +206,39 @@ class application {
                              : memory_values;
         res.framework = rxres.str(m_fname_ids["LABEL"]);
         res.benchmark_name = rxres.str(m_fname_ids["BENCHMARK"]);
-        res.path = std::move(fname);
+        res.file = move(file);
       } else {
         res.type = invalid_file;
-        cerr << "*** file name \"" << fname
+        cerr << "*** file name \"" << file.string() 
              << "\" does not match regex" << endl;
       }
       return res;
     };
-    vector<benchmark_file> files;
-    transform(fnames.begin(), fnames.end(), back_inserter(files), parse_fname);
-    files.erase(remove_if(files.begin(), files.end(), is_invalid_file),
-                files.end());
+    vector<benchmark_file> bench_files;
+    transform(files.begin(), files.end(), back_inserter(bench_files),
+              parse_fname);
+    bench_files.erase(
+      remove_if(bench_files.begin(), bench_files.end(), is_invalid_file),
+      bench_files.end());
     // get the names of our benchmarks
     auto bench_name = [](const benchmark_file& bf) {
       return bf.benchmark_name;
     };
     vector<string> benchs;
-    transform(files.begin(), files.end(), back_inserter(benchs), bench_name);
+    transform(bench_files.begin(), bench_files.end(), back_inserter(benchs),
+              bench_name);
     sort(benchs.begin(), benchs.end());
     benchs.erase(unique(benchs.begin(), benchs.end()), benchs.end());
     m_benchmarks.swap(benchs);
     // separate
-    auto first_mem = partition(files.begin(), files.end(), has_runtime_values);
+    auto first_mem =
+      partition(bench_files.begin(), bench_files.end(), has_runtime_values);
     // sort subranges by benchmark name
-    sort(files.begin(), first_mem, bench_name_cmp);
-    sort(first_mem, files.end(), bench_name_cmp);
+    sort(bench_files.begin(), first_mem, bench_name_cmp);
+    sort(first_mem, bench_files.end(), bench_name_cmp);
     // convert runtime and memory files
-    convert_runtime_files(files.begin(), first_mem);
-    convert_mem_files(first_mem, files.end());
+    convert_runtime_files(bench_files.begin(), first_mem);
+    convert_mem_files(first_mem, bench_files.end());
   }
 
  private:
@@ -250,9 +257,9 @@ class application {
       // $framework => {$num_units => [$values]}
       map<string, map<size_t, vector<double>>> samples;
       for (; first != eor; ++first) {
-        auto vals = content(first->path, 1);
+        auto vals = content(first->file, 1);
         if (vals.empty()) {
-          cerr << "*** no values found in " << first->path << endl;
+          cerr << "*** no values found in " << first->file.string() << endl;
         } else {
           auto& out = samples[first->framework][first->num_units];
           for (auto& row : vals) {
@@ -322,7 +329,7 @@ class application {
       // $framework => [$values]
       map<string, vector<double>> samples;
       for (; first != eor; ++first) {
-        auto vals = content(first->path, 2);
+        auto vals = content(first->file, 2);
         if (!vals.empty()) {
           auto& out = samples[first->framework];
           for (auto& row : vals) {
@@ -370,10 +377,10 @@ class application {
     convert_mem_files(eor, last);
   }
 
-  vector<vector<double>> content(const file_name& fname, size_t row_size) {
+  vector<vector<double>> content(const path& fname, size_t row_size) {
     vector<vector<double>> result;
     string line;
-    ifstream f{fname};
+    ifstream f{fname.string()};
     istream_iterator<double> eos; // end-of-stream iterator
     while (getline(f, line)) {
       vector<double> values;
@@ -389,7 +396,7 @@ class application {
     if (!result.empty() && all_of(result.begin(), result.end(), pred)) {
       return result;
     }
-    cerr << "*** invalid or empty file: " << fname << endl;
+    cerr << "*** invalid or empty file: " << fname.string() << endl;
     return {};
   }
 
@@ -402,15 +409,42 @@ class application {
   string m_unit_name; // usually either "cores" or "machines"
 };
 
+void help_text() {
+  cout << "Usage: to_csv [-f file_format] <DIRECTORIES|FILES>" << endl;
+}
+
+vector<path> to_fnames(vector<string> args) {
+  using namespace boost::filesystem;
+  vector<path> res;
+  auto add_if_file = [&](const path& arg) {
+    if (is_regular_file(arg)) {
+      res.emplace_back(arg.string());
+    }
+  };
+  for(path arg: args) {
+    if (is_directory(arg)) {
+      for_each(directory_iterator(arg), directory_iterator(), add_if_file);
+    } else { // is file
+      add_if_file(arg);
+    }
+  }
+  return res;
+}
+
 int main(int argc, char** argv) {
   int offset = 0;
   pair<regex, map<string, size_t>> format_config;
-  if (argc >= 3 && strcmp(argv[1], "-f") == 0) {
-    offset = 2;
-    format_config = read_format(argv[2]);
-  } else {
-    format_config = read_format(file_name_default_format);
+  if (argc >= 2) {
+    if (strcmp(argv[1], "-f") == 0) {
+      offset = 2;
+      format_config = read_format(argv[2]);
+    } else {
+      format_config = read_format(file_name_default_format);
+    }
+    if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
+      help_text(); 
+    }
   }
   application app{std::move(format_config)};
-  app.run({argv + 1 + offset, argv + argc});
+  app.run(to_fnames({argv + 1 + offset, argv + argc}));
 }

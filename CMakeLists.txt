@@ -444,10 +444,12 @@ set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 #                                    tools                                     #
 ################################################################################
 
-find_package(Boost)
+find_package(Boost COMPONENTS system filesystem)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
+  set(LD_FLAGS ${LD_FLAGS} ${Boost_SYSTEM_LIBRARY})
+  set(LD_FLAGS ${LD_FLAGS} ${Boost_FILESYSTEM_LIBRARY})
   target_link_libraries(to_csv ${LD_FLAGS})
 endif()
 
