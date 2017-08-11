@@ -130,11 +130,11 @@ behavior controller(stateful_actor<controller_data>* self, int controller_id,
                     size_t num_matrix_searchers, search_pattern pattern,
                     size_t matrix_size, int search_size, int num_searches) {
   auto& s = self->state;
-  // create matrix searcher (worker)
+  // create matrix searchers and distribue them evenly among all PUs 
   for (size_t id = 0; id < num_matrix_searchers; ++id) {
-    auto ms =
-      actor_cast<actor>(self->spawn(matrix_searcher, actor_cast<actor>(self),
-                                    controller_id, id, matrix_size));
+    auto ms = actor_cast<actor>(
+      self->system().spawn(matrix_searcher, actor_cast<actor>(self),
+                           controller_id, id, matrix_size));
     s.matrix_searchers.emplace_back(matrix_searcher_props{move(ms), 0});
   }
   // generate all search requests
