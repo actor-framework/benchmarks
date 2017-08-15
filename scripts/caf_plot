@@ -14,6 +14,8 @@ MEMORY_TYPE=1
 PERFORMANCE_TYPE=2
 plot_type=$NONE_TYPE
 
+R_SCRIPT=""
+
 # R parameters
 Rtitle=""
 Rltitle=""
@@ -29,17 +31,17 @@ Rxmax=""
 set_memory_type() {
   plot_type=$MEMORY_TYPE
   Rxlabel=""
-  Rylabel="Resident Set Size [MB]"
+  Rylabel=""
 }
 
 set_performance_type() {
   plot_type=$PERFORMANCE_TYPE
-  Rxlabel="Number of Cores [#]"
-  Rylabel="Time [s]"
+  Rxlabel=""
+  Rylabel=""
 }
 
 usage() {
-  >&2 echo "usage: $0 PLOTTYPE [FILE1] [FILE2,LABEL1,LABEL2,...]... [OPTION]... [VAR=VALUE]...
+  >&2 echo "usage: $0 PLOTTYPE [FILE1] [FILE2,LABEL1,LABEL2,...]... [OPTION]...
 
   PLOTTYPE: memory or performance
   FILE:     path to a csv file
@@ -59,6 +61,8 @@ usage() {
     --ylim=MIN,MAX      set limits of y-axis
                           e.g ylim=0,10 or ylim=,10 or ylim=10
     --xlim=MIN,MAX      set limits of x-axis (similar to ylim)
+    --rscript=FILE      set a R-script (default: plot_performacne.R or 
+                          plot_memory.R)
 
   e.g.: $0 performance f2015.csv,CAF f2016,CAF1,CAF2 --tlabel=\"CAF 2015\",\"2016a\",\"2016b\"
 "
@@ -133,9 +137,9 @@ rename_labels_in_file() {
   fi
   for idx in ${!label_list[@]}; do
     if [ "$(uname)" == "Linux" ]; then
-      sed -i "s/${label_list[$idx]}/${new_label_list[$idx]}/g" "$csv_tmp_file"
+      sed -i "s/\"${label_list[$idx]}\"/\"${new_label_list[$idx]}\"/g" "$csv_tmp_file"
     elif [ "$(uname)" == "Darwin" ]; then #MacOs
-      sed -i "" "s/${label_list[$idx]}/${new_label_list[$idx]}/g" "$csv_tmp_file"
+      sed -i "" "s/\"${label_list[$idx]}\"/\"${new_label_list[$idx]}\"/g" "$csv_tmp_file"
     else
       >&2 echo "Operating System not supported"
       exit 1
@@ -240,6 +244,9 @@ while [ $# -ne 0 ]; do
     --xlim=*)
       set_axis_limits "x" "$optarg"
       ;;
+    --rscript=*)
+      R_SCRIPT="$optarg"
+      ;;
   esac
   shift
 done
@@ -262,20 +269,23 @@ for arg in $args; do
   append_Rscript_args $arg
 done
 
-# find R-scripts
-path_to_r_script="."
-# (a) Am I a real file (not symbolic) then it is assumed all R-scripts are in the same directory
-if ! [ -L "$0" ]; then
-  path_to_r_script=$(dirname "$0")
-fi
-# (b) Am I a symbolic link then follow the link to the real file and do (a)
-if [ -L "$0" ]; then
-  path_to_r_script=$(dirname $(readlink -f "$0"))
+# find plot-scripts if not set
+if [ "$R_SCRIPT" == "" ]; then
+  path_to_r_script="."
+  # (a) Am I a real file (not symbolic) then it is assumed all R-scripts are in the same directory
+  if ! [ -L "$0" ]; then
+    path_to_r_script=$(dirname "$0")
+  fi
+  # (b) Am I a symbolic link then follow the link to the real file and do (a)
+  if [ -L "$0" ]; then
+    path_to_r_script=$(dirname $(readlink -f "$0"))
+  fi
+  if [ $plot_type == $PERFORMANCE_TYPE ]; then
+    R_SCRIPT="${path_to_r_script}/plot_performance.R"
+  else
+    R_SCRIPT="${path_to_r_script}/plot_memory.R"
+  fi
 fi
 
-if [ $plot_type == $PERFORMANCE_TYPE ]; then
-  eval "Rscript --vanilla ${path_to_r_script}/plot_performance.R $Rscript_args"
-else
-  eval "Rscript --vanilla ${path_to_r_script}/plot_memory.R $Rscript_args"
-fi
+eval "Rscript --vanilla ${R_SCRIPT} $Rscript_args"
 

@@ -13,7 +13,7 @@ option_list <- list(
               help="not used", metavar="character"),
 	make_option(c("--xlabel"), type="character", default=NULL, 
               help="set label of x-axis", metavar="character"),
-	make_option(c("--ylabel"), type="character", default="Resident Set Size [MB]", 
+	make_option(c("--ylabel"), type="character", default=NULL, 
               help="set label of y-axis", metavar="character"),
 	make_option(c("--ydivider"), type="double", default=1, 
               help="set divider for y-axis", metavar="double")
