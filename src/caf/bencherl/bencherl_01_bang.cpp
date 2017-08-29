@@ -21,8 +21,12 @@
 
 #include "caf/all.hpp"
 
+#include "benchmark_helper.hpp"
+
 using namespace std;
 using namespace caf;
+
+using done_atom = atom_constant<atom("done")>;
 
 struct bang_t {
   std::array<uint64_t, 5> refs;
@@ -35,23 +39,30 @@ void send_fun(event_based_actor* self, actor t, bang_t m, int n) {
   }
 }
 
-behavior rec_fun(event_based_actor*, int n) {
+behavior rec_fun(event_based_actor* self, actor parent, int n) {
   return {
     [=] (const bang_t&) mutable {
       --n;
-      //if (n == 0) {
-        //self->quit();
-      //}
+      if (n == 0) {
+        self->send(parent, done_atom::value);
+        self->quit(); //oK;
+      }
     }
   };
 }
 
-void run(actor_system& system, int s, int m) {
+behavior run(event_based_actor* self, int s, int m) {
   bang_t bang;
-  auto rec = system.spawn(rec_fun, s * m);
+  auto rec = spawn_link(self, rec_fun, actor_cast<actor>(self), s * m);
   for (int i = 0; i < s; ++i) {
-    system.spawn(send_fun, rec, bang, m); 
+    spawn_link(self, send_fun, rec, bang, m);
   }
+  return {
+    [=](done_atom) {
+      // receive Done -> ok end,
+      self->quit();
+    }
+  };
 }
 
 void usage() {
@@ -86,6 +97,7 @@ int main(int argc, char** argv) {
   actor_system system{cfg};
   int s = f * cores; //num of senders 
   int m = f * cores; //num of messages
-  run(system, s, m);
+  system.spawn(run, s, m);
+  system.await_all_actors_done();
 }
 

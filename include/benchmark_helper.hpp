@@ -24,6 +24,8 @@
 #include <limits>
 #include <random>
 
+#include "caf/all.hpp"
+
 class pseudo_random {
 public:
   pseudo_random(long seed)
@@ -57,4 +59,22 @@ public:
 private:
   long value_ = 74755; 
 };
+
+
+template <class F, class... Ts>
+caf::infer_handle_from_fun_t<F>
+spawn_link(caf::scheduled_actor* self, F fun, Ts&&... xs) {
+  using namespace caf;
+  auto spawned_actor = self->spawn(fun, std::forward<Ts>(xs)...);
+  self->monitor(spawned_actor);
+  self->set_down_handler(
+    [=](const down_msg& dm) {
+      if (dm.source == spawned_actor) {
+        self->quit();
+      } 
+    }
+  );
+  return spawned_actor;
+}
+
 #endif // BENCHMARK_HELPER_HPP
