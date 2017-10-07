@@ -165,11 +165,11 @@ behavior controller(stateful_actor<controller_data>* self, int controller_id,
       return false; 
     }
   };
-  // send a search request to matrix searcher
+  // send a search request to each matrix searcher
   for(size_t i = 0; i < s.matrix_searchers.size(); ++i) {
     send_search_request(i);
   }
-  // receive and resend search requests until all search requests are processed 
+  // receive and send search requests until all search requests are processed 
   return {
     [=](result_atom, size_t ms_id, uint64_t num_findings) {
       auto& s = self->state;

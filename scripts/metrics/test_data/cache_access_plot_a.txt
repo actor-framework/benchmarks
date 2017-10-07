@@ -1,0 +1,20 @@
+--------------------------------------------------------------------------------
+CPU name:       AMD Opteron(tm) Processor 6376
+CPU type:       AMD Interlagos processor
+CPU clock:      2.30 GHz
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+STRUCT,Info,3,,,
+CPU name:,AMD Opteron(tm) Processor 6376,,,,
+CPU type:,AMD Interlagos processor,,,,
+CPU clock:,2.299991809 GHz,,,,
+TABLE,Group 1 Raw,Custom,3,,
+Event,Counter,Core 0,Core 1,Core 2,Core 3
+Runtime (RDTSC) [s],TSC,1.423463e+01,1.423463e+01,1.423463e+01,1.423463e+01
+DATA_CACHE_ACCESSES,PMC0,3486404963,1161,267702,5781
+DATA_CACHE_MISSES_ALL,PMC1,635627568,101,11727,307
+TABLE,Group 1 Raw STAT,Custom,3,,
+Event,Counter,Sum,Min,Max,Avg
+Runtime (RDTSC) [s] STAT,TSC,56.9385,14.2346,14.2346,14.2346
+DATA_CACHE_ACCESSES STAT,PMC0,3486679607,1161,3486404963,8.716699e+08
+DATA_CACHE_MISSES_ALL STAT,PMC1,635639703,101,635627568,1.589099e+08

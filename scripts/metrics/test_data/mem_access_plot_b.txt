@@ -1,0 +1,21 @@
+--------------------------------------------------------------------------------
+CPU name:       AMD Opteron(tm) Processor 6376
+CPU type:       AMD Interlagos processor
+CPU clock:      2.30 GHz
+--------------------------------------------------------------------------------
+sum copy rate: 7161 MBytes/s
+--------------------------------------------------------------------------------
+STRUCT,Info,3,,,
+CPU name:,AMD Opteron(tm) Processor 6376,,,,
+CPU type:,AMD Interlagos processor,,,,
+CPU clock:,2.300045113 GHz,,,,
+TABLE,Group 1 Raw,Custom,3,,
+Event,Counter,Core 8,Core 24,Core 40,Core 56
+Runtime (RDTSC) [s],TSC,5.245886e+00,5.245886e+00,5.245886e+00,5.245886e+00
+UNC_CPU_REQUEST_TO_MEMORY_LOCAL_LOCAL_CPU_MEM,UPMC0,10029,1237594332,4373,68691
+UNC_CPU_REQUEST_TO_MEMORY_LOCAL_REMOTE_CPU_MEM,UPMC1,14752,2255008,7062,1933210
+TABLE,Group 1 Raw STAT,Custom,3,,
+Event,Counter,Sum,Min,Max,Avg
+Runtime (RDTSC) [s] STAT,TSC,20.9835,5.2459,5.2459,5.2459
+UNC_CPU_REQUEST_TO_MEMORY_LOCAL_LOCAL_CPU_MEM STAT,UPMC0,1237677425,4373,1237594332,3.094194e+08
+UNC_CPU_REQUEST_TO_MEMORY_LOCAL_REMOTE_CPU_MEM STAT,UPMC1,4210032,7062,2255008,1052508
