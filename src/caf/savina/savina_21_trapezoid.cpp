@@ -97,6 +97,7 @@ struct master_state {
 };
 
 behavior master_fun(stateful_actor<master_state>* self, int num_workers) {
+  self->reset_home_eu();
   auto& s = self->state;
   s.workers.reserve(num_workers);
   for (int i = 0; i < num_workers; ++i) {

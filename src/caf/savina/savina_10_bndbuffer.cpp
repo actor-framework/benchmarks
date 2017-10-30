@@ -151,6 +151,7 @@ struct manager_actor_state {
 behavior manager_actor(stateful_actor<manager_actor_state>* self, int buffer_size,
                        int num_producers, int num_consumers,
                        int num_items_per_producer) {
+  self->reset_home_eu();
   auto& s = self->state;
   s.self = actor_cast<actor>(self);
   s.adjust_buffer_size = buffer_size - num_producers;

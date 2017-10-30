@@ -66,6 +66,7 @@ public:
 int config::write_percentage = 10;
 
 behavior dictionary_fun(stateful_actor<config::data_map>* self) {
+  self->reset_home_eu();
   return {
     [=](write_msg& write_message) {
       auto& key = write_message.key;

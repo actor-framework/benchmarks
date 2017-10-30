@@ -206,6 +206,7 @@ behavior worker_fun(event_based_actor* self, actor master, actor sorted_list,
 }
 
 behavior sorted_list_fun(stateful_actor<sorted_linked_list<int>>* self) {
+  self->reset_home_eu();
   return {
     [=](write_msg& write_message) {
       auto& data_list = self->state;

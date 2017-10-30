@@ -171,6 +171,7 @@ struct master_data {
 
 behavior master_fun(stateful_actor<master_data>* self, int num_workers,
                     int priorities) {
+  self->reset_home_eu();
   auto send_work = [=](work_msg&& work_message) {
     auto& s = self->state;
     self->send(s.workers[self->state.message_counter], move(work_message));

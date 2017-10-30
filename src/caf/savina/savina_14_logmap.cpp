@@ -184,6 +184,7 @@ struct master_state {
 };
 
 behavior master_fun(stateful_actor<master_state>* self) {
+  self->reset_home_eu();
   auto& s = self->state;
   int num_computers = config::num_series;
   s.computers.reserve(num_computers);
