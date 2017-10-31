@@ -52,6 +52,7 @@ struct philosopher_states {
 
 behavior philosopher_actor(stateful_actor<philosopher_states>* self, int id,
                            int rounds, atomic_long* counter, actor arbitrator) {
+  self->reset_home_eu();
   return {
     [=](denied_atom) {
       auto& s = self->state;
@@ -83,7 +84,6 @@ struct arbitrator_actor_state {
 
 behavior arbitrator_actor(stateful_actor<arbitrator_actor_state>* self,
                           int num_forks) {
-  self->reset_home_eu();
   auto& s = self->state;
   s.forks.reserve(num_forks);
   for (int i = 0; i < num_forks; ++i) {

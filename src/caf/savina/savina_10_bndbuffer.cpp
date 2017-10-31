@@ -91,6 +91,7 @@ struct consumer_actor_state {
 };
 
 behavior consumer_actor(stateful_actor<consumer_actor_state>* self, int /*id*/, actor manager) {
+  self->reset_home_eu();
   auto& s = self->state;
   s.consumer_available_message =
     consumer_available_msg{actor_cast<actor>(self)};
@@ -117,6 +118,7 @@ struct producer_actor_state {
 
 behavior producer_actor(stateful_actor<producer_actor_state>* self, int /*id*/, actor manager,
                         int num_items_to_produce) {
+  self->reset_home_eu();
   auto produce_data = [=]() {
     auto& s = self->state;
     s.prod_item = process_item(s.prod_item, config::prod_cost);
@@ -151,7 +153,6 @@ struct manager_actor_state {
 behavior manager_actor(stateful_actor<manager_actor_state>* self, int buffer_size,
                        int num_producers, int num_consumers,
                        int num_items_per_producer) {
-  self->reset_home_eu();
   auto& s = self->state;
   s.self = actor_cast<actor>(self);
   s.adjust_buffer_size = buffer_size - num_producers;

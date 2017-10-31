@@ -74,6 +74,7 @@ struct series_worker_state {
 
 behavior series_worker_fun(stateful_actor<series_worker_state>* self, int /*id*/,
                            actor master, actor computer, double start_term) {
+  self->reset_home_eu();
   auto& s = self->state;
   s.cur_term.emplace_back(start_term);
   return {
@@ -106,6 +107,7 @@ struct series_worker_state {
 
 behavior series_worker_fun(stateful_actor<series_worker_state>* self, int /*id*/,
                            actor master, actor computer, double start_term) {
+  self->reset_home_eu();
   auto& s = self->state;
   self->set_default_handler(skip);
   s.cur_term.emplace_back(start_term);
@@ -138,6 +140,7 @@ struct series_worker_state {
 
 behavior series_worker_fun(stateful_actor<series_worker_state>* self, int /*id*/,
                            actor master, actor computer, double start_term) {
+  self->reset_home_eu();
   auto& s = self->state;
   self->set_default_handler(skip);
   s.cur_term.emplace_back(start_term);
@@ -184,7 +187,6 @@ struct master_state {
 };
 
 behavior master_fun(stateful_actor<master_state>* self) {
-  self->reset_home_eu();
   auto& s = self->state;
   int num_computers = config::num_series;
   s.computers.reserve(num_computers);

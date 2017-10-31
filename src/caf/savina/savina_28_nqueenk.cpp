@@ -122,6 +122,7 @@ void nqueens_kernel_seq(event_based_actor* self, actor master, int size,
 };
 
 behavior worker_fun(event_based_actor* self, actor master, int /*id*/) {
+  self->reset_home_eu();
   auto size = config::size;
   auto threshold = config::threshold;
   // calc N-Queens problem in parallel
@@ -171,7 +172,6 @@ struct master_data {
 
 behavior master_fun(stateful_actor<master_data>* self, int num_workers,
                     int priorities) {
-  self->reset_home_eu();
   auto send_work = [=](work_msg&& work_message) {
     auto& s = self->state;
     self->send(s.workers[self->state.message_counter], move(work_message));

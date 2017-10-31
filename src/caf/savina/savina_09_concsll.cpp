@@ -179,7 +179,7 @@ public:
 
 behavior worker_fun(event_based_actor* self, actor master, actor sorted_list,
                     int id, int num_msgs_per_worker) {
-
+  self->reset_home_eu();
   auto write_percent = config::write_percentage;
   auto size_percent = config::size_percentage;
   int msg_count = 0;
@@ -206,7 +206,6 @@ behavior worker_fun(event_based_actor* self, actor master, actor sorted_list,
 }
 
 behavior sorted_list_fun(stateful_actor<sorted_linked_list<int>>* self) {
-  self->reset_home_eu();
   return {
     [=](write_msg& write_message) {
       auto& data_list = self->state;

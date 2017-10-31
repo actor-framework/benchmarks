@@ -70,6 +70,7 @@ struct result_msg {
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(result_msg);
 
 behavior worker_fun(event_based_actor* self, actor master, int id) {
+  self->reset_home_eu();
   return {
     [=](work_msg& wm) {
       int n =  ((wm.r - wm.l) / wm.h);
@@ -97,7 +98,6 @@ struct master_state {
 };
 
 behavior master_fun(stateful_actor<master_state>* self, int num_workers) {
-  self->reset_home_eu();
   auto& s = self->state;
   s.workers.reserve(num_workers);
   for (int i = 0; i < num_workers; ++i) {

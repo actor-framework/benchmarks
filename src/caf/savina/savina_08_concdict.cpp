@@ -66,7 +66,6 @@ public:
 int config::write_percentage = 10;
 
 behavior dictionary_fun(stateful_actor<config::data_map>* self) {
-  self->reset_home_eu();
   return {
     [=](write_msg& write_message) {
       auto& key = write_message.key;
@@ -93,6 +92,7 @@ behavior dictionary_fun(stateful_actor<config::data_map>* self) {
 
 behavior worker_fun(event_based_actor* self, actor master, actor dictionary,
                       int id, int num_msgs_per_worker) {
+  self->reset_home_eu();
   const auto write_percent = config::write_percentage;
   int message_count = 0;
   pseudo_random random(id + num_msgs_per_worker + write_percent);
