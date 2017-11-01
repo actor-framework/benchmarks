@@ -29,12 +29,55 @@ using result_atom = atom_constant<atom("result")>;
 using quit_atom = atom_constant<atom("quit")>;
 
 enum class search_pattern {
- horizontal, vertical
+ none, horizontal, vertical
 };
 
-enum class task_assign_pattern {
- continious, block_wise
+const std::map<char, search_pattern> search_pattern_lookup = { 
+  {'h', search_pattern::horizontal},
+  {'v', search_pattern::vertical}
 };
+
+search_pattern to_search_pattern(const string& str){
+  using s = search_pattern;
+  auto result = s::none;
+  if (str.size() == 1) {
+    auto it = search_pattern_lookup.find(str[0]);
+    if (it != search_pattern_lookup.end()) {
+      result = it->second;
+    }
+  }
+  return result;
+}
+
+enum task_assign_pattern {
+  none = 0,
+  continious = 1,
+  block_wise = 2,
+  round_robin = 4,
+  local = 8
+};
+
+const std::map<char, task_assign_pattern> task_assign_pattern_lookup = { 
+  {'c', task_assign_pattern::continious},
+  {'b', task_assign_pattern::block_wise},
+  {'r', task_assign_pattern::round_robin},
+  {'l', task_assign_pattern::local}
+};
+
+task_assign_pattern to_task_assign_pattern(const string& str){
+  using t = task_assign_pattern;
+  int result = t::none;
+  for (auto& x: str) {
+    auto it = task_assign_pattern_lookup.find(x);
+    if (it != task_assign_pattern_lookup.end()) {
+      result |= it->second;
+    } else {
+      return t::none; 
+    }
+  }
+  return static_cast<task_assign_pattern>(result);
+}
+
 
 using search_t = string;
 using matrix_t = vector<search_t>;
@@ -167,8 +210,13 @@ behavior controller(stateful_actor<controller_data>* self, int controller_id,
     auto& s = self->state;
     auto& ms = s.matrix_searchers[ms_id];
     if (ms.num_of_searches < s.search_list.size()) {
-      self->send(ms.matrix_searcher, search_atom::value, s_pattern,
-                 s.search_list[ms.num_of_searches]);
+      if (t_pattern & task_assign_pattern::local) {
+        self->send(ms.matrix_searcher, search_atom::value, s_pattern,
+                   s.search_list[ms.num_of_searches]);
+      } else if (t_pattern & task_assign_pattern::round_robin) {
+        anon_send(ms.matrix_searcher, search_atom::value, s_pattern,
+                  s.search_list[ms.num_of_searches]);
+      }
       ++ms.num_of_searches;
     } else {
       ++s.num_finished_matrix_searcher;
@@ -183,9 +231,9 @@ behavior controller(stateful_actor<controller_data>* self, int controller_id,
     [=](result_atom, size_t ms_id, uint64_t num_findings) {
       auto& s = self->state;
       s.num_findings += num_findings;
-      if (t_pattern == task_assign_pattern::continious) {
+      if (t_pattern & task_assign_pattern::continious) {
         send_search_request(ms_id);
-      } else { // task_assign_pattern::block_wise
+      } else if (t_pattern & task_assign_pattern::block_wise) {
         ++s.num_temporarly_finished_matrix_searcher;
         if (s.num_temporarly_finished_matrix_searcher
             == s.matrix_searchers.size()) {
@@ -214,7 +262,7 @@ public:
   int search_size = 6;
   string search_pattern = "v"; //v=vertical, h=horizontal
   size_t matrix_size = 3500;
-  string task_assign_pattern = "c"; //c=continious, b=block wise
+  string task_assign_pattern = "cl"; //<c=continious|b=block wise><r=round robin|l=local>
 
   config() {
     opt_group{custom_options_, "global"}
@@ -225,28 +273,24 @@ public:
       .add(search_pattern, "search-pattern",
            "search pattern (h=horizontal, v=vertical) ")
       .add(matrix_size, "msize", "size of the matrix")
+      .add(matrix_size, "msize", "size of the matrix")
       .add(task_assign_pattern, "task-assign-pattern",
-           "task assign patter (c=continious, b=block wise)");
+           "task assign patter (<c=continious|b=block wise><r=round robin|l=local>)");
   }
 };
 
 void caf_main(actor_system& system, const config& cfg) {
   search_pattern s_pattern;
   task_assign_pattern t_pattern;
-  if (cfg.search_pattern == "h" ) {
-    s_pattern = search_pattern::horizontal;
-  } else if (cfg.search_pattern == "v" ) {
-    s_pattern = search_pattern::vertical;
-  } else {
+  s_pattern = to_search_pattern(cfg.search_pattern);
+  if (s_pattern == search_pattern::none) {
     cerr << "Unknown search pattern: " << cfg.search_pattern << endl;
     return;
   }
-  if (cfg.task_assign_pattern == "c") {
-    t_pattern = task_assign_pattern::continious;
-  } else if (cfg.task_assign_pattern == "b" ) {
-    t_pattern = task_assign_pattern::block_wise;
-  } else {
-    cerr << "Unknown task assign pattern: " << cfg.task_assign_pattern << endl;
+  t_pattern = to_task_assign_pattern(cfg.task_assign_pattern);
+  if (t_pattern == task_assign_pattern::none) {
+    cerr << "Unknown task assign pattern: " << cfg.task_assign_pattern
+         << endl;
     return;
   }
   for(int id = 0; id < cfg.num_controllers; ++id) {
