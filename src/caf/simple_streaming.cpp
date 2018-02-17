@@ -66,7 +66,7 @@ behavior source(stateful_actor<source_state>* self) {
       self->state.tick();
     },
     [=](start_atom) -> stream<string> {
-      return self->add_source(
+      return self->make_source(
         // initialize state
         [&](unit_t&) {
           // nop
@@ -90,7 +90,7 @@ behavior sink(event_based_actor* self, actor src) {
   self->send(self * src, start_atom::value);
   return {
     [=](stream<string>& in) {
-      return self->add_sink(
+      return self->make_sink(
         // input stream
         in,
         // initialize state
