@@ -10,6 +10,8 @@ set(CAF_COMPILED_BENCHES "")
 
 find_package(CAF COMPONENTS core io REQUIRED)
 
+include_directories(${CAF_INCLUDE_DIRS})
+
 ################################################################################
 #                                   Utility                                    #
 ################################################################################
