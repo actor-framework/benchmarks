@@ -65,7 +65,7 @@ behavior source(stateful_actor<source_state>* self) {
       self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
       self->state.tick();
     },
-    [=](start_atom) -> stream<string> {
+    [=](start_atom) {
       return self->make_source(
         // initialize state
         [&](unit_t&) {
