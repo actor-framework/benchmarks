@@ -36,30 +36,18 @@ using sink_atom = atom_constant<atom("sink")>;
 using source_atom = atom_constant<atom("source")>;
 using both_atom = atom_constant<atom("both")>;
 
-constexpr size_t max_samples = 10;
-
-struct source_state {
+struct tick_state {
   size_t count = 0;
-  vector<size_t> samples;
-
-  size_t avg() {
-    if (samples.empty())
-      return 0;
-    return accumulate(samples.begin(), samples.end(), size_t{0})
-           / samples.size();
-  }
 
   void tick() {
-    if (samples.size() == max_samples)
-      samples.erase(samples.begin());
-    samples.emplace_back(count);
+    cout << count << " messages/s" << endl;
     count = 0;
-    cout << avg() << " messages/s" << endl;
   }
 };
 
-behavior source(stateful_actor<source_state>* self) {
-  self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
+behavior source(stateful_actor<tick_state>* self, bool print_rate) {
+  if (print_rate)
+    self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
   return {
     [=](tick_atom) {
       self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
@@ -86,9 +74,14 @@ behavior source(stateful_actor<source_state>* self) {
   };
 }
 
-behavior sink(event_based_actor* self, actor src) {
+behavior sink(stateful_actor<tick_state>* self, actor src) {
   self->send(self * src, start_atom::value);
+  self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
   return {
+    [=](tick_atom) {
+      self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
+      self->state.tick();
+    },
     [=](stream<string>& in) {
       return self->make_sink(
         // input stream
@@ -98,8 +91,8 @@ behavior sink(event_based_actor* self, actor src) {
           // nop
         },
         // processing step
-        [](unit_t&, string) {
-          // nop
+        [=](unit_t&, string) {
+          self->state.count += 1;
         },
         // cleanup and produce result message
         [](unit_t&) {
@@ -127,10 +120,10 @@ struct config : actor_system_config {
 void caf_main(actor_system& sys, const config& cfg) {
   switch (static_cast<uint64_t>(cfg.mode)) {
     case both_atom::uint_value():
-      sys.spawn(sink, sys.spawn(source));
+      sys.spawn(sink, sys.spawn(source, false));
       break;
     case source_atom::uint_value():
-      sys.middleman().publish(sys.spawn(source), cfg.port);
+      sys.middleman().publish(sys.spawn(source, true), cfg.port);
       break;
     case sink_atom::uint_value(): {
       auto s = sys.middleman().remote_actor(cfg.host, cfg.port);
