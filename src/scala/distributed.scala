@@ -40,7 +40,7 @@ class PingActor(parent: ActorRef) extends Actor {
     }
 }
 
-class ServerActor(system: ActorSystem) extends Actor {
+class ServerActor extends Actor {
 
     import context.become
 
@@ -68,7 +68,7 @@ class ServerActor(system: ActorSystem) extends Actor {
 case class TokenTimeout(token: String)
 case class RunClient(paths: List[String], numPings: Int)
 
-class ClientActor(system: ActorSystem) extends Actor {
+class ClientActor extends Actor {
 
     import context.become
 
@@ -126,7 +126,7 @@ class ClientActor(system: ActorSystem) extends Actor {
                 val token = p1.path.toStringWithAddress(p1.path.address) + " -> " + p2.path.toStringWithAddress(p2.path.address)
                 p1 ! AddPong(p2, token)
                 import context.dispatcher // Use this Actors' Dispatcher as ExecutionContext
-                system.scheduler.scheduleOnce(10.seconds, self, TokenTimeout(token))
+                context.system.scheduler.scheduleOnce(10.seconds, self, TokenTimeout(token))
             }
 
             become(collectOkMessages(pongs, pongs.length * (pongs.length - 1), Nil, numPings))
@@ -138,7 +138,7 @@ object distributed {
 
     def runServer() {
         val system = ActorSystem("pongServer", ConfigFactory.load.getConfig("pongServer"))
-        system.actorOf(Props(new ServerActor(system)), "pong")
+        system.actorOf(Props(classOf[ServerActor]), "pong")
     }
 
     //private val NumPings = "num_pings=([0-9]+)".r
@@ -162,7 +162,7 @@ object distributed {
     def runBenchmark(args: List[String]) {
         run(args, Nil, None, ((paths, x) => {
             val system = ActorSystem("benchmark", ConfigFactory.load.getConfig("benchmark"))
-            system.actorOf(Props(new ClientActor(system))) ! RunClient(paths, x)
+            system.actorOf(Props(classOf[ClientActor]), "client") ! RunClient(paths, x)
             global_latch.await
             Await.result(system.terminate, Duration.Inf)
             System.exit(0)
