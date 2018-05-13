@@ -1,6 +1,6 @@
 package org.libcppa
 
-import org.libcppa.utility._
+import org.caf.scala.utility._
 
 import Console.println
 import scala.{PartialFunction => PF}

@@ -13,6 +13,8 @@ import org.caf.scala.utility._
 
 import Array._
 import java.io.BufferedOutputStream
+import scala.concurrent.duration.Duration
+import scala.concurrent.Await
 
 object mandelbrot {
 
@@ -70,7 +72,7 @@ object mandelbrot {
           x += 1
         }
         context stop self
-        global_latch countDown
+        global_latch.countDown
       }
     }
   }
@@ -97,7 +99,7 @@ object mandelbrot {
       //  y += 1
       //}
       //w.close
-      system.shutdown
+      Await.result(system.terminate, Duration.Inf)
       System.exit(0)
     }
     case _ => usage

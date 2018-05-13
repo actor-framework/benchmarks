@@ -4,6 +4,8 @@ import org.caf.scala.utility._
 
 import akka.actor._
 import scala.annotation.tailrec
+import scala.concurrent.duration.Duration
+import scala.concurrent.Await
 
 case object Msg
 case object RunSender
@@ -42,7 +44,7 @@ object mailbox_performance {
                 //}).start
             }
             global_latch.await
-            system.shutdown
+            Await.result(system.terminate, Duration.Inf)
             System.exit(0)
         }
         case _ => usage

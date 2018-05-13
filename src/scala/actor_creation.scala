@@ -3,6 +3,8 @@ package org.caf.scala
 import org.caf.scala.utility._
 
 import akka.actor._
+import scala.concurrent.duration.Duration
+import scala.concurrent.Await
 
 case class Spread(value: Int)
 case class Result(value: Int)
@@ -28,7 +30,7 @@ class Testee(parent: ActorRef) extends Actor {
                   System.exit(42)
                 }
                 context.stop(self)
-                global_latch countDown
+                global_latch.countDown
               } else {
                 parent ! Result(1 + r1 + r2)
                 context.stop(self)
@@ -47,7 +49,7 @@ object actor_creation {
       val system = ActorSystem()
       system.actorOf(Props(new Testee(null))) ! Spread(n)
       global_latch.await
-      system.shutdown
+      Await.result(system.terminate, Duration.Inf)
       System.exit(0)
     }
     case _ => usage
