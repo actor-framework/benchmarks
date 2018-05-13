@@ -172,16 +172,21 @@ object distributed {
     def main(args: Array[String]): Unit = args match {
         case Array("mode=server") => runServer
         // client mode
-        case Array("mode=benchmark", _*) => runBenchmark(args.toList.drop(2))
+        case Array("mode=benchmark", _*) => {
+          runBenchmark(args.toList.drop(1))
+        }
         // error
         case _ => {
             println("Running in server mode:\n"                              +
                     "  mode=server\n"                                        +
-                    "  remote_actors PORT *or* akka\n"                       +
                     "\n"                                                     +
                     "Running the benchmark:\n"                               +
                     "  mode=benchmark\n"                                     +
-                    "  remote_actors ... *or* akka\n"                         );
+                    "  num_pings=NUM\n"                                      +
+                    "  PONG_ACTOR1 PONG_ACTOR2 [...]\n"                      +
+                    "\n"                                                     +
+                    "  where PONG_ACTOR is an actor path anchor, e.g.,\n"    +
+                    "  akka.tcp://pongServer@hostname:2552/user/pong")
         }
     }
 
