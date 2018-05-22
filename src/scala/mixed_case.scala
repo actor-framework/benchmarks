@@ -4,6 +4,8 @@ import org.caf.scala.utility._
 
 import akka.actor._
 import scala.annotation.tailrec
+import scala.concurrent.duration.Duration
+import scala.concurrent.Await
 
 case class Token(value: Int)
 
@@ -118,7 +120,7 @@ object mixed_case {
             val s = system.actorOf(Props(new Supervisor(numMessages, numRings, ringSize, initToken, reps)))
             s ! Init
             global_latch.await
-            system.shutdown
+            Await.result(system.terminate, Duration.Inf)
             System.exit(0)
         }
         case _ => usage

@@ -11,9 +11,9 @@ object utility {
     }
 
     object KeyValuePair {
-        val Rx = "([^=])+=([^=]*)".r
-        def unapply(s: String): Option[Pair[String, String]] = s match {
-            case Rx(key, value) => Some(Pair(key, value))
+        val Rx = "([^=]+)=([^=]*)".r
+        def unapply(s: String): Option[(String, String)] = s match {
+            case Rx(key, value) => Some((key, value))
             case _ => None
         }
     }
