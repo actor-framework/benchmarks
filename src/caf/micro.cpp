@@ -37,70 +37,28 @@ using namespace caf;
 
 using mscount = int_least64_t;
 
-#define CAF_BENCH_START(bname, barg)                                           \
-  auto t1 = std::chrono::high_resolution_clock::now()
-
-#define CAF_BENCH_DONE()                                                       \
-  std::chrono::duration_cast<std::chrono::milliseconds>(                       \
-    std::chrono::high_resolution_clock::now() - t1).count()
-
 namespace {
 
+constexpr size_t num_messages = 1000000;
+
 constexpr size_t num_iterations_per_bench = 1000000;
-constexpr size_t num_bench_runs = 10;
+
 size_t s_invoked = 0;
 
-template <class F, class... Ts>
-void run_bench(const char* name, const char* desc, F fun, Ts&&... args) {
-  cout << name << " [" << num_iterations_per_bench << " iterations, "
-       << num_bench_runs << " runs, msec] " << desc << endl;
-  for (size_t i = 0; i < num_bench_runs; ++i) {
-    cout << fun(std::forward<Ts>(args)...) << endl;
-  }
-}
-
 // returns nr. of ms
-mscount message_creation_native() {
-  CAF_BENCH_START(message_creation_native, num);
-  message msg = make_message(size_t{0});
-  for (size_t i = 0; i < num_iterations_per_bench; ++i) {
-    msg = make_message(msg.get_as<size_t>(0) + 1);
+void message_creation_native(benchmark::State& state) {
+  for (auto _ : state) {
+    auto msg = make_message(size_t{0});
+    benchmark::DoNotOptimize(msg);
   }
-  if (msg.get_as<size_t>(0) != num_iterations_per_bench) {
-    std::cerr << "wrong result, found " << msg.get_as<size_t>(0)
-              << ", expected " << num_iterations_per_bench << std::endl;
-  }
-  return CAF_BENCH_DONE();
 }
 
-mscount message_creation_dynamic() {
-  CAF_BENCH_START(message_creation_dynamic, num);
-  message_builder mb;
-  message msg = mb.append(size_t{0}).to_message();
-  for (size_t i = 0; i < num_iterations_per_bench; ++i) {
-    mb.clear();
-    msg = mb.append(msg.get_as<size_t>(0) + 1).to_message();
+void message_creation_dynamic(benchmark::State& state) {
+  for (auto _ : state) {
+    message_builder mb;
+    message msg = mb.append(size_t{0}).to_message();
+    benchmark::DoNotOptimize(msg);
   }
-  if (msg.get_as<size_t>(0) != num_iterations_per_bench) {
-    std::cerr << "wrong result, found " << msg.get_as<size_t>(0)
-              << ", expected " << num_iterations_per_bench << std::endl;
-  }
-  return CAF_BENCH_DONE();
-}
-
-mscount match_performance(behavior& bhvr, std::vector<message>& mvec) {
-  CAF_BENCH_START(message_creation_native, num);
-  for (size_t i = 0; i < num_iterations_per_bench; ++i) {
-    for (size_t j = 0; j < mvec.size(); ++j) {
-      s_invoked = 0;
-      bhvr(mvec[j]);
-      if (s_invoked != (j + 1) * 2) {
-        cerr << "wrong handler called" << endl;
-        return -1;
-      }
-    }
-  }
-  return CAF_BENCH_DONE();
 }
 
 struct foo {
@@ -128,20 +86,29 @@ CAF_ALLOW_UNSAFE_MESSAGE_TYPE(bar)
 
 namespace {
 
-void run_match_bench_with_builtin_only() {
-  std::vector<message> v1{make_message(1, 2),
-                          make_message(1.0, 2.0),
-                          make_message("hi", "there")};
-  std::vector<message> v2;
+template <class... Ts>
+message make_dynamic_message(Ts&&... xs) {
   message_builder mb;
-  v2.push_back(mb.append(1).append(2).to_message());
-  mb.clear();
-  v2.push_back(mb.append(1.0).append(2.0).to_message());
-  mb.clear();
-  v2.push_back(mb.append("hi").append("there").to_message());
-  mb.clear();
-  std::vector<std::vector<message>> messages_vec{std::move(v1), std::move(v2)};
-  behavior bhvr{
+  return mb.append_all(std::forward<Ts>(xs)...).to_message();
+}
+
+struct fixture : benchmark::Fixture {
+  actor_system_config cfg;
+  actor_system sys{cfg};
+
+  message native_two_ints = make_message(1, 2);
+  message native_two_doubles = make_message(1.0, 2.0);
+  message native_two_strings = make_message("hi", "there");
+  message native_one_foo = make_message(foo{1, 2});
+  message native_one_bar = make_message(bar{foo{1, 2}});
+
+  message dynamic_two_ints = make_dynamic_message(1, 2);
+  message dynamic_two_doubles = make_dynamic_message(1.0, 2.0);
+  message dynamic_two_strings = make_dynamic_message("hi", "there");
+  message dynamic_one_foo = make_dynamic_message(foo{1, 2});
+  message dynamic_one_bar = make_dynamic_message(bar{foo{1, 2}});
+
+  behavior bhvr = behavior{
     [&](int) {
       s_invoked = 1;
     },
@@ -159,45 +126,52 @@ void run_match_bench_with_builtin_only() {
     },
     [&](const std::string&, const std::string&) {
       s_invoked = 6;
+    },
+    [&](const foo&) {
+      s_invoked = 7;
+    },
+    [&](const bar&) {
+      s_invoked = 8;
     }
   };
-  std::vector<const char*> descs{"using make_message", "using message builder"};
-  for (size_t i = 0; i < 2; ++i) {
-    run_bench("match builtin types", descs[i],
-              match_performance, bhvr, messages_vec[i]);
+
+  bool match(benchmark::State &state, message &msg,
+             size_t expected_handler_id) {
+    s_invoked = 0;
+    bhvr(msg);
+    if (s_invoked != expected_handler_id) {
+      state.SkipWithError("Wrong handler called!");
+      return false;
+    }
+    return true;
+  }
+};
+
+BENCHMARK_DEFINE_F(fixture, MatchNative)(benchmark::State& state) {
+  for (auto _ : state) {
+    if (!match(state, native_two_ints, 2)
+        || !match(state, native_two_doubles, 4)
+        || !match(state, native_two_strings, 6)
+        || !match(state, native_one_foo, 7)
+        || !match(state, native_one_bar, 8))
+      break;
   }
 }
 
-void run_match_bench_with_userdefined_types() {
-  std::vector<message> v1{make_message(foo{1, 2}),
-                          make_message(bar{foo{1, 2}, "hello"})};
-  std::vector<message> v2;
-  message_builder mb;
-  v2.push_back(mb.append(foo{1, 2}).to_message());
-  mb.clear();
-  v2.push_back(mb.append(bar{foo{1, 2}, "hello"}).to_message());
-  mb.clear();
-  std::vector<std::vector<message>> messages_vec{std::move(v1), std::move(v2)};
-  behavior bhvr{
-    [&](int) {
-      s_invoked = 1;
-    },
-    [&](const foo&) {
-      s_invoked = 2;
-    },
-    [&](double) {
-      s_invoked = 3;
-    },
-    [&](const bar&) {
-      s_invoked = 4;
-    }
-  };
-  std::vector<const char*> descs{"using make_message", "using message builder"};
-  for (size_t i = 0; i < 2; ++i) {
-    run_bench("match user-defined types", descs[i],
-              match_performance, bhvr, messages_vec[i]);
+BENCHMARK_REGISTER_F(fixture, MatchNative);
+
+BENCHMARK_DEFINE_F(fixture, MatchDynamic)(benchmark::State& state) {
+  for (auto _ : state) {
+    if (!match(state, dynamic_two_ints, 2)
+        || !match(state, dynamic_two_doubles, 4)
+        || !match(state, dynamic_two_strings, 6)
+        || !match(state, dynamic_one_foo, 7)
+        || !match(state, dynamic_one_bar, 8))
+      break;
   }
 }
+
+BENCHMARK_REGISTER_F(fixture, MatchDynamic);
 
 struct source_state {
   const char* name = "source";
@@ -241,8 +215,7 @@ behavior stage(stateful_actor<stage_state>* self) {
         },
         // processing step
         [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
-          xs.push(x);
-        },
+          xs.push(x); },
         // cleanup
         [=](unit_t&) {
           // nop
@@ -279,28 +252,6 @@ behavior sink(stateful_actor<sink_state>* self) {
   };
 }
 
-/*
-int main() {
-  run_bench("message creation (native)", "", message_creation_native);
-  run_bench("message creation (dynamic)", "", message_creation_dynamic);
-  run_match_bench_with_builtin_only();
-  run_match_bench_with_userdefined_types();
-}
-*/
-
-struct fixture : benchmark::Fixture {
-  actor_system_config cfg;
-  actor_system sys;
-
-  fixture() : sys(cfg) {
-    // nop
-  }
-};
-
-constexpr size_t num_messages = 1000000;
-
-} // namespace <anonymous>
-
 BENCHMARK_DEFINE_F(fixture, StreamPipeline)(benchmark::State& state) {
   for (auto _ : state) {
     {
@@ -313,7 +264,14 @@ BENCHMARK_DEFINE_F(fixture, StreamPipeline)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, StreamPipeline)->Arg(0);//->Arg(1)->Arg(2)->Arg(3);
+BENCHMARK_REGISTER_F(fixture, StreamPipeline)
+    ->Arg(0)
+    ->Arg(1)
+;/* TODO: uncomment after fixing CAF issue #781
+    ->Arg(2)
+    ->Arg(3)
+    ->Arg(4);
+*/
 
 BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
   auto sender = [](event_based_actor* self, actor snk) {
@@ -345,6 +303,13 @@ BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, AsyncPipeline)->Arg(0);//->Arg(1)->Arg(2)->Arg(3);
+BENCHMARK_REGISTER_F(fixture, AsyncPipeline)
+    ->Arg(0)
+    ->Arg(1)
+    ->Arg(2)
+    ->Arg(3)
+    ->Arg(4);
+
+} // namespace <anonymous>
 
 BENCHMARK_MAIN();
