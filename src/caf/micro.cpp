@@ -25,6 +25,8 @@
 #include <cstdint>
 #include <iostream>
 
+#include <benchmark/benchmark.h>
+
 #include "caf/all.hpp"
 
 using std::cout;
@@ -47,8 +49,6 @@ namespace {
 constexpr size_t num_iterations_per_bench = 1000000;
 constexpr size_t num_bench_runs = 10;
 size_t s_invoked = 0;
-
-} // namespace <anonymous>
 
 template <class F, class... Ts>
 void run_bench(const char* name, const char* desc, F fun, Ts&&... args) {
@@ -121,8 +121,12 @@ inline bool operator==(const bar& lhs, const bar& rhs) {
   return lhs.a == rhs.a && lhs.b == rhs.b;
 }
 
+} // namespace <anonymous>
+
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(foo)
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(bar)
+
+namespace {
 
 void run_match_bench_with_builtin_only() {
   std::vector<message> v1{make_message(1, 2),
@@ -195,9 +199,152 @@ void run_match_bench_with_userdefined_types() {
   }
 }
 
+struct source_state {
+  const char* name = "source";
+};
+
+void source(stateful_actor<source_state> *self, actor dest,
+            size_t max_messages) {
+  self->make_source(
+    dest,
+    // initialize state
+    [](size_t& n) {
+      n = 0;
+    },
+    // get next element
+    [=](size_t& n, downstream<uint64_t>& out, size_t hint) {
+      auto num = std::min(hint, max_messages - n);
+      for (size_t i = 0; i < num; ++i)
+        out.push(i);
+      n += num;
+    },
+    // check whether we reached the end
+    [=](const size_t& n) {
+      return n == max_messages;
+    }
+  );
+}
+
+struct stage_state {
+  const char* name = "stage";
+};
+
+behavior stage(stateful_actor<stage_state>* self) {
+  return {
+    [=](const stream<uint64_t>& in) {
+      return self->make_stage(
+        // input stream
+        in,
+        // initialize state
+        [](unit_t&) {
+          // nop
+        },
+        // processing step
+        [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
+          xs.push(x);
+        },
+        // cleanup
+        [=](unit_t&) {
+          // nop
+        }
+      );
+    }
+  };
+}
+
+struct sink_state {
+  const char* name = "sink";
+};
+
+behavior sink(stateful_actor<sink_state>* self) {
+  return {
+    [=](const stream<uint64_t>& in) {
+      return self->make_sink(
+        // input stream
+        in,
+        // initialize state
+        [](unit_t&) {
+          // nop
+        },
+        // processing step
+        [=](unit_t&, uint64_t) {
+          // nop
+        },
+        // cleanup
+        [=](unit_t&) {
+          // nop
+        }
+      );
+    }
+  };
+}
+
+/*
 int main() {
   run_bench("message creation (native)", "", message_creation_native);
   run_bench("message creation (dynamic)", "", message_creation_dynamic);
   run_match_bench_with_builtin_only();
   run_match_bench_with_userdefined_types();
 }
+*/
+
+struct fixture : benchmark::Fixture {
+  actor_system_config cfg;
+  actor_system sys;
+
+  fixture() : sys(cfg) {
+    // nop
+  }
+};
+
+constexpr size_t num_messages = 1000000;
+
+} // namespace <anonymous>
+
+BENCHMARK_DEFINE_F(fixture, StreamPipeline)(benchmark::State& state) {
+  for (auto _ : state) {
+    {
+      auto snk = sys.spawn(sink);
+      for (auto i = 0; i < state.range(0); ++i)
+        snk = snk * sys.spawn(stage);
+      sys.spawn(source, snk, num_messages);
+    }
+    sys.await_all_actors_done();
+  }
+}
+
+BENCHMARK_REGISTER_F(fixture, StreamPipeline)->Arg(0);//->Arg(1)->Arg(2)->Arg(3);
+
+BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
+  auto sender = [](event_based_actor* self, actor snk) {
+    for (uint64_t i = 0; i < num_messages; ++i)
+      self->send(snk, i);
+  };
+  auto relay = [](event_based_actor* self, actor snk) -> behavior {
+    return {
+      [=](uint64_t x) {
+        self->send(snk, x);
+      }
+    };
+  };
+  auto receiver = []() -> behavior{
+    return {
+      [](uint64_t) {
+        // nop
+      }
+    };
+  };
+  for (auto _ : state) {
+    {
+      auto snk = sys.spawn(receiver);
+      for (auto i = 0; i < state.range(0); ++i)
+        snk = sys.spawn(relay, snk);
+      sys.spawn(sender, snk);
+    }
+    sys.await_all_actors_done();
+  }
+}
+
+BENCHMARK_REGISTER_F(fixture, AsyncPipeline)->Arg(0);//->Arg(1)->Arg(2)->Arg(3);
+
+BENCHMARK_MAIN();

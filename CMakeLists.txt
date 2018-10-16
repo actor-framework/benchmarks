@@ -336,7 +336,6 @@ add_caf_benchmark(actor_creation)
 add_caf_benchmark(mailbox_performance)
 add_caf_benchmark(mixed_case)
 add_caf_benchmark(mandelbrot)
-add_caf_benchmark(micro)
 #add_caf_benchmark(distributed)
 add_caf_benchmark(matrix)
 add_caf_benchmark(matching)
@@ -344,6 +343,12 @@ add_caf_benchmark(scheduling)
 add_caf_benchmark(simple_streaming)
 set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
 
+find_package(benchmark)
+if(benchmark_FOUND)
+  add_executable(micro ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/micro.cpp)
+  target_link_libraries(micro ${CAF_LIBRARIES} ${LD_FLAGS} benchmark::benchmark_main)
+  add_dependencies(all_benchmarks micro)
+endif()
 
 ################################################################################
 #                          some environment variables                          #
