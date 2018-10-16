@@ -19,13 +19,15 @@ usage="\
 Usage: $0 [OPTION]... [VAR=VALUE]...
 
   Build Options:
+    --build-dir=DIR             CMake build directory
+    --build-type=STRING         CMake build type
     --with-javac=FILE           path to Java compiler
     --with-java=FILE            path to Java Runtime
     --with-scalac=FILE          path to Scala compiler
     --with-erlc=FILE            path to Erlang compiler
     --with-charmc=FILE          path to Charm++ compiler
     --with-salsa=FILE           path to SALSA Lite jar
-    --with-caf-prefix=DIR       root directory of CAF installation
+    --with-caf=DIR              path to CAF installation
 
   Influential Environment Variables (only on first invocation):
     CXX                         C++ compiler command
@@ -147,6 +149,12 @@ while [ $# -ne 0 ]; do
             echo "${usage}" 1>&2
             exit 1
             ;;
+        --build-dir=*)
+            builddir="$optarg"
+            ;;
+        --build-type=*)
+            append_cache_entry CMAKE_BUILD_TYPE STRING "$optarg"
+            ;;
         --generator=*)
             CMakeGenerator="$optarg"
             ;;
@@ -174,7 +182,7 @@ while [ $# -ne 0 ]; do
         --with-salsa=*)
             append_cache_entry CAF_SALSA_JAR FILEPATH "$optarg"
             ;;
-        --with-caf-prefix=*)
+        --with-caf=*)
             append_cache_entry CAF_ROOT_DIR FILEPATH "$optarg"
             ;;
         *)
