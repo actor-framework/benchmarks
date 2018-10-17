@@ -29,19 +29,16 @@
 
 #include "caf/all.hpp"
 
-using std::cout;
 using std::cerr;
+using std::cout;
 using std::endl;
+using std::vector;
 
 using namespace caf;
-
-using mscount = int_least64_t;
 
 namespace {
 
 constexpr size_t num_messages = 1000000;
-
-constexpr size_t num_iterations_per_bench = 1000000;
 
 size_t s_invoked = 0;
 
@@ -225,13 +222,43 @@ behavior stage(stateful_actor<stage_state>* self) {
   };
 }
 
+struct fork_state {
+  const char* name = "fork";
+};
+
+behavior fork(stateful_actor<fork_state>* self, vector<actor> sinks) {
+  auto mgr = self->make_continuous_stage(
+    // initialize state
+    [](unit_t&) {
+      // nop
+    },
+    // processing step
+    [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
+      xs.push(x);
+    },
+    // cleanup
+    [=](unit_t&) {
+      // nop
+    }
+  );
+  for (auto& snk : sinks)
+    mgr->add_outbound_path(snk);
+  return {
+    [=](stream<uint64_t> in) {
+      self->unbecome();
+      mgr->continuous(false);
+      return mgr->add_inbound_path(in);
+    }
+  };
+}
+
 struct sink_state {
   const char* name = "sink";
 };
 
 behavior sink(stateful_actor<sink_state>* self) {
   return {
-    [=](const stream<uint64_t>& in) {
+    [=](stream<uint64_t> in) {
       return self->make_sink(
         // input stream
         in,
@@ -272,6 +299,22 @@ BENCHMARK_REGISTER_F(fixture, StreamPipeline)
     ->Arg(3)
     ->Arg(4);
 */
+
+BENCHMARK_DEFINE_F(fixture, StreamFork)(benchmark::State& state) {
+  for (auto _ : state) {
+    {
+      vector<actor> sinks;
+      for (auto i = 0; i < state.range(0); ++i)
+        sinks.emplace_back(sys.spawn(sink));
+      sys.spawn(source, sys.spawn(fork, std::move(sinks)), num_messages);
+    }
+    sys.await_all_actors_done();
+  }
+}
+
+BENCHMARK_REGISTER_F(fixture, StreamFork)
+    ->Arg(2)
+    ->Arg(3);
 
 BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
   auto sender = [](event_based_actor* self, actor snk) {
