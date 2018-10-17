@@ -294,11 +294,9 @@ BENCHMARK_DEFINE_F(fixture, StreamPipeline)(benchmark::State& state) {
 BENCHMARK_REGISTER_F(fixture, StreamPipeline)
     ->Arg(0)
     ->Arg(1)
-;/* TODO: uncomment after fixing CAF issue #781
     ->Arg(2)
     ->Arg(3)
     ->Arg(4);
-*/
 
 BENCHMARK_DEFINE_F(fixture, StreamFork)(benchmark::State& state) {
   for (auto _ : state) {
@@ -313,8 +311,10 @@ BENCHMARK_DEFINE_F(fixture, StreamFork)(benchmark::State& state) {
 }
 
 BENCHMARK_REGISTER_F(fixture, StreamFork)
+    ->Arg(1)
     ->Arg(2)
-    ->Arg(3);
+    ->Arg(3)
+    ->Arg(4);
 
 BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
   auto sender = [](event_based_actor* self, actor snk) {
