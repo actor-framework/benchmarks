@@ -28,6 +28,7 @@
 #include <benchmark/benchmark.h>
 
 #include "caf/all.hpp"
+#include "caf/io/all.hpp"
 
 using std::cerr;
 using std::cout;
@@ -89,7 +90,7 @@ message make_dynamic_message(Ts&&... xs) {
   return mb.append_all(std::forward<Ts>(xs)...).to_message();
 }
 
-struct fixture : benchmark::Fixture {
+struct SingleSystem : benchmark::Fixture {
   actor_system_config cfg;
   actor_system sys{cfg};
 
@@ -144,7 +145,7 @@ struct fixture : benchmark::Fixture {
   }
 };
 
-BENCHMARK_DEFINE_F(fixture, MatchNative)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(SingleSystem, MatchNative)(benchmark::State& state) {
   for (auto _ : state) {
     if (!match(state, native_two_ints, 2)
         || !match(state, native_two_doubles, 4)
@@ -155,9 +156,9 @@ BENCHMARK_DEFINE_F(fixture, MatchNative)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, MatchNative);
+BENCHMARK_REGISTER_F(SingleSystem, MatchNative);
 
-BENCHMARK_DEFINE_F(fixture, MatchDynamic)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(SingleSystem, MatchDynamic)(benchmark::State& state) {
   for (auto _ : state) {
     if (!match(state, dynamic_two_ints, 2)
         || !match(state, dynamic_two_doubles, 4)
@@ -168,7 +169,7 @@ BENCHMARK_DEFINE_F(fixture, MatchDynamic)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, MatchDynamic);
+BENCHMARK_REGISTER_F(SingleSystem, MatchDynamic);
 
 struct source_state {
   const char* name = "source";
@@ -256,22 +257,25 @@ struct sink_state {
   const char* name = "sink";
 };
 
-behavior sink(stateful_actor<sink_state>* self) {
+behavior sink(stateful_actor<sink_state>* self, actor done_listener) {
   return {
     [=](stream<uint64_t> in) {
       return self->make_sink(
         // input stream
         in,
         // initialize state
-        [](unit_t&) {
-          // nop
+        [](size_t& count) {
+          count = 0;
         },
         // processing step
-        [=](unit_t&, uint64_t) {
-          // nop
+        [=](size_t& count, uint64_t) {
+          if (++count == num_messages) {
+            self->send(done_listener, ok_atom::value);
+            count = 0;
+          }
         },
         // cleanup
-        [=](unit_t&) {
+        [=](size_t&) {
           // nop
         }
       );
@@ -279,10 +283,10 @@ behavior sink(stateful_actor<sink_state>* self) {
   };
 }
 
-BENCHMARK_DEFINE_F(fixture, StreamPipeline)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(SingleSystem, StreamPipeline)(benchmark::State& state) {
   for (auto _ : state) {
     {
-      auto snk = sys.spawn(sink);
+      auto snk = sys.spawn(sink, actor{});
       for (auto i = 0; i < state.range(0); ++i)
         snk = snk * sys.spawn(stage);
       sys.spawn(source, snk, num_messages);
@@ -291,32 +295,32 @@ BENCHMARK_DEFINE_F(fixture, StreamPipeline)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, StreamPipeline)
+BENCHMARK_REGISTER_F(SingleSystem, StreamPipeline)
     ->Arg(0)
     ->Arg(1)
     ->Arg(2)
     ->Arg(3)
     ->Arg(4);
 
-BENCHMARK_DEFINE_F(fixture, StreamFork)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(SingleSystem, StreamFork)(benchmark::State& state) {
   for (auto _ : state) {
     {
       vector<actor> sinks;
       for (auto i = 0; i < state.range(0); ++i)
-        sinks.emplace_back(sys.spawn(sink));
+        sinks.emplace_back(sys.spawn(sink, actor{}));
       sys.spawn(source, sys.spawn(fork, std::move(sinks)), num_messages);
     }
     sys.await_all_actors_done();
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, StreamFork)
+BENCHMARK_REGISTER_F(SingleSystem, StreamFork)
     ->Arg(1)
     ->Arg(2)
     ->Arg(3)
     ->Arg(4);
 
-BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(SingleSystem, AsyncPipeline)(benchmark::State& state) {
   auto sender = [](event_based_actor* self, actor snk) {
     for (uint64_t i = 0; i < num_messages; ++i)
       self->send(snk, i);
@@ -346,12 +350,120 @@ BENCHMARK_DEFINE_F(fixture, AsyncPipeline)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(fixture, AsyncPipeline)
+BENCHMARK_REGISTER_F(SingleSystem, AsyncPipeline)
     ->Arg(0)
     ->Arg(1)
     ->Arg(2)
     ->Arg(3)
     ->Arg(4);
+
+struct continuous_stage_state {
+  const char* name = "continuous_stage";
+};
+
+behavior continuous_stage(stateful_actor<continuous_stage_state> *self,
+                          actor next_hop) {
+  auto mgr = self->make_continuous_stage(
+    // initialize state
+    [](unit_t&) {
+      // nop
+    },
+    // processing step
+    [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
+      xs.push(x); },
+    // cleanup
+    [=](unit_t&) {
+      // nop
+    }
+  );
+  mgr->add_outbound_path(next_hop);
+  return {
+    [=](const stream<uint64_t>& in) {
+      mgr->add_inbound_path(in);
+    }
+  };
+}
+
+template <size_t NumStages>
+struct ManySystems : benchmark::Fixture {
+  struct config : actor_system_config {
+    config() {
+      load<io::middleman>();
+      add_message_type_impl<stream<uint64_t>>("stream<uint64_t>");
+      add_message_type_impl<vector<uint64_t>>("vector<uint64_t>");
+    }
+  };
+
+  struct node {
+    config cfg;
+    actor_system sys{cfg};
+    actor hdl;
+    uint16_t port;
+  };
+
+  actor first_hop;
+
+  static constexpr size_t num_nodes = NumStages + 2;
+
+  static constexpr size_t source_node_id = 0;
+
+  static constexpr size_t sink_node_id = NumStages + 1;
+
+  std::array<node, num_nodes> nodes;
+
+  scoped_actor sink_listener;
+
+  template <class T>
+  T unbox(expected<T> x) {
+    if (!x)
+      throw std::runtime_error("unbox failed");
+    return std::move(*x);
+  }
+
+  ManySystems() : sink_listener{nodes.back().sys} {
+    uint16_t first_hop_port = 0;
+    auto& sink_node = nodes.back();
+    sink_node.hdl = sink_node.sys.spawn(sink, sink_listener);
+    sink_node.port = unbox(sink_node.sys.middleman().publish(sink_node.hdl, 0u));
+    for (size_t i = NumStages; i > 0; --i) {
+      auto& x = nodes[i];
+      auto next_hop = unbox(x.sys.middleman().remote_actor("127.0.0.1",
+                                                           nodes[i + 1].port));
+      x.hdl = x.sys.spawn(continuous_stage, next_hop);
+      x.port = unbox(x.sys.middleman().publish(x.hdl, 0u));
+    }
+    first_hop_port = nodes[1].port;
+    first_hop = unbox(nodes[0].sys.middleman().remote_actor("127.0.0.1",
+                                                            first_hop_port));
+  }
+
+  ~ManySystems() {
+    for (auto& x : nodes)
+      anon_send_exit(x.hdl, exit_reason::user_shutdown);
+  }
+
+  void run() {
+    nodes.front().sys.spawn(source, first_hop, num_messages);
+    sink_listener->receive(
+      [](ok_atom) {
+        // nop
+      }
+    );
+  }
+};
+
+#define ManySystemsStreamPipeline(num)                                         \
+  BENCHMARK_TEMPLATE_F(ManySystems, StreamPipeline_##num, num)                 \
+  (benchmark::State & state) {                                                 \
+    for (auto _ : state)                                                       \
+      run();                                                                   \
+  }
+
+ManySystemsStreamPipeline(0)
+ManySystemsStreamPipeline(1)
+ManySystemsStreamPipeline(2)
+ManySystemsStreamPipeline(3)
+ManySystemsStreamPipeline(4)
 
 } // namespace <anonymous>
 
