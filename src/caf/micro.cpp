@@ -37,27 +37,38 @@ using std::vector;
 
 using namespace caf;
 
+// -- constants and global state -----------------------------------------------
+
 namespace {
 
 constexpr size_t num_messages = 1000000;
 
 size_t s_invoked = 0;
 
-// returns nr. of ms
-void message_creation_native(benchmark::State& state) {
+} // namespace <anonymous>
+
+// -- benchmarking of message creation -----------------------------------------
+
+void NativeMessageCreation(benchmark::State& state) {
   for (auto _ : state) {
     auto msg = make_message(size_t{0});
     benchmark::DoNotOptimize(msg);
   }
 }
 
-void message_creation_dynamic(benchmark::State& state) {
+BENCHMARK(NativeMessageCreation);
+
+void DynamicMessageCreation(benchmark::State& state) {
   for (auto _ : state) {
     message_builder mb;
     message msg = mb.append(size_t{0}).to_message();
     benchmark::DoNotOptimize(msg);
   }
 }
+
+BENCHMARK(DynamicMessageCreation);
+
+// -- custom message type ------------------------------------------------------
 
 struct foo {
   int a;
@@ -77,12 +88,10 @@ inline bool operator==(const bar& lhs, const bar& rhs) {
   return lhs.a == rhs.a && lhs.b == rhs.b;
 }
 
-} // namespace <anonymous>
-
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(foo)
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(bar)
 
-namespace {
+// -- pattern matching benchmark -----------------------------------------------
 
 template <class... Ts>
 message make_dynamic_message(Ts&&... xs) {
@@ -90,10 +99,7 @@ message make_dynamic_message(Ts&&... xs) {
   return mb.append_all(std::forward<Ts>(xs)...).to_message();
 }
 
-struct SingleSystem : benchmark::Fixture {
-  actor_system_config cfg;
-  actor_system sys{cfg};
-
+struct Messages : benchmark::Fixture {
   message native_two_ints = make_message(1, 2);
   message native_two_doubles = make_message(1.0, 2.0);
   message native_two_strings = make_message("hi", "there");
@@ -145,7 +151,7 @@ struct SingleSystem : benchmark::Fixture {
   }
 };
 
-BENCHMARK_DEFINE_F(SingleSystem, MatchNative)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, MatchNative)(benchmark::State& state) {
   for (auto _ : state) {
     if (!match(state, native_two_ints, 2)
         || !match(state, native_two_doubles, 4)
@@ -156,9 +162,9 @@ BENCHMARK_DEFINE_F(SingleSystem, MatchNative)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(SingleSystem, MatchNative);
+BENCHMARK_REGISTER_F(Messages, MatchNative);
 
-BENCHMARK_DEFINE_F(SingleSystem, MatchDynamic)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, MatchDynamic)(benchmark::State& state) {
   for (auto _ : state) {
     if (!match(state, dynamic_two_ints, 2)
         || !match(state, dynamic_two_doubles, 4)
@@ -169,7 +175,17 @@ BENCHMARK_DEFINE_F(SingleSystem, MatchDynamic)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(SingleSystem, MatchDynamic);
+BENCHMARK_REGISTER_F(Messages, MatchDynamic);
+
+// -- utility for running streaming benchmarks ---------------------------------
+
+void StreamingSettings(benchmark::internal::Benchmark* b) {
+  for (int i = 0; i <= 4; ++i)
+    for (int j = 1; j <= 1000000; j *= 10)
+      b->Args({i, j});
+}
+
+// -- simple integer source ----------------------------------------------------
 
 struct source_state {
   const char* name = "source";
@@ -197,6 +213,8 @@ void source(stateful_actor<source_state> *self, actor dest,
   );
 }
 
+// -- simple integer stage -----------------------------------------------------
+
 struct stage_state {
   const char* name = "stage";
 };
@@ -213,7 +231,8 @@ behavior stage(stateful_actor<stage_state>* self) {
         },
         // processing step
         [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
-          xs.push(x); },
+          xs.push(x);
+        },
         // cleanup
         [=](unit_t&) {
           // nop
@@ -222,6 +241,8 @@ behavior stage(stateful_actor<stage_state>* self) {
     }
   };
 }
+
+// -- simple integer fork state ------------------------------------------------
 
 struct fork_state {
   const char* name = "fork";
@@ -253,6 +274,37 @@ behavior fork(stateful_actor<fork_state>* self, vector<actor> sinks) {
   };
 }
 
+// -- simple stage for building pipelines one-by-one ---------------------------
+
+struct continuous_stage_state {
+  const char* name = "continuous_stage";
+};
+
+behavior continuous_stage(stateful_actor<continuous_stage_state> *self,
+                          actor next_hop) {
+  auto mgr = self->make_continuous_stage(
+    // initialize state
+    [](unit_t&) {
+      // nop
+    },
+    // processing step
+    [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
+      xs.push(x); },
+    // cleanup
+    [=](unit_t&) {
+      // nop
+    }
+  );
+  mgr->add_outbound_path(next_hop);
+  return {
+    [=](const stream<uint64_t>& in) {
+      mgr->add_inbound_path(in);
+    }
+  };
+}
+
+// -- simple integer sink ------------------------------------------------------
+
 struct sink_state {
   const char* name = "sink";
 };
@@ -283,24 +335,27 @@ behavior sink(stateful_actor<sink_state>* self, actor done_listener) {
   };
 }
 
+// -- fixture for single-system streaming --------------------------------------
+
+struct SingleSystem : benchmark::Fixture {
+  actor_system_config cfg;
+  actor_system sys{cfg};
+};
+
 BENCHMARK_DEFINE_F(SingleSystem, StreamPipeline)(benchmark::State& state) {
   for (auto _ : state) {
     {
       auto snk = sys.spawn(sink, actor{});
       for (auto i = 0; i < state.range(0); ++i)
         snk = snk * sys.spawn(stage);
-      sys.spawn(source, snk, num_messages);
+      sys.spawn(source, snk, static_cast<size_t>(state.range(1)));
     }
     sys.await_all_actors_done();
   }
 }
 
 BENCHMARK_REGISTER_F(SingleSystem, StreamPipeline)
-    ->Arg(0)
-    ->Arg(1)
-    ->Arg(2)
-    ->Arg(3)
-    ->Arg(4);
+    ->Apply(StreamingSettings);
 
 BENCHMARK_DEFINE_F(SingleSystem, StreamFork)(benchmark::State& state) {
   for (auto _ : state) {
@@ -315,12 +370,9 @@ BENCHMARK_DEFINE_F(SingleSystem, StreamFork)(benchmark::State& state) {
 }
 
 BENCHMARK_REGISTER_F(SingleSystem, StreamFork)
-    ->Arg(1)
-    ->Arg(2)
-    ->Arg(3)
-    ->Arg(4);
+    ->Apply(StreamingSettings);
 
-BENCHMARK_DEFINE_F(SingleSystem, AsyncPipeline)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(SingleSystem, MessagePipeline)(benchmark::State& state) {
   auto sender = [](event_based_actor* self, actor snk) {
     for (uint64_t i = 0; i < num_messages; ++i)
       self->send(snk, i);
@@ -350,39 +402,10 @@ BENCHMARK_DEFINE_F(SingleSystem, AsyncPipeline)(benchmark::State& state) {
   }
 }
 
-BENCHMARK_REGISTER_F(SingleSystem, AsyncPipeline)
-    ->Arg(0)
-    ->Arg(1)
-    ->Arg(2)
-    ->Arg(3)
-    ->Arg(4);
+BENCHMARK_REGISTER_F(SingleSystem, MessagePipeline)
+    ->Apply(StreamingSettings);
 
-struct continuous_stage_state {
-  const char* name = "continuous_stage";
-};
-
-behavior continuous_stage(stateful_actor<continuous_stage_state> *self,
-                          actor next_hop) {
-  auto mgr = self->make_continuous_stage(
-    // initialize state
-    [](unit_t&) {
-      // nop
-    },
-    // processing step
-    [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
-      xs.push(x); },
-    // cleanup
-    [=](unit_t&) {
-      // nop
-    }
-  );
-  mgr->add_outbound_path(next_hop);
-  return {
-    [=](const stream<uint64_t>& in) {
-      mgr->add_inbound_path(in);
-    }
-  };
-}
+// -- fixture for multi-system streaming ---------------------------------------
 
 template <size_t NumStages>
 struct ManySystems : benchmark::Fixture {
@@ -464,7 +487,5 @@ ManySystemsStreamPipeline(1)
 ManySystemsStreamPipeline(2)
 ManySystemsStreamPipeline(3)
 ManySystemsStreamPipeline(4)
-
-} // namespace <anonymous>
 
 BENCHMARK_MAIN();
