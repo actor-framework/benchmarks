@@ -186,9 +186,8 @@ int caf_main(actor_system& system, const my_config& cfg) {
     }
     vector<char*> arr;
     arr.emplace_back(const_cast<char*>(cfg.bench.c_str()));
-    for (size_t i = 0; i < cfg.args_remainder.size(); ++i) {
-      arr.emplace_back(
-        const_cast<char*>(cfg.args_remainder.get_as<string>(i).c_str()));
+    for (size_t i = 0; i < cfg.remainder.size(); ++i) {
+      arr.emplace_back(const_cast<char *>(cfg.remainder[i].c_str()));
     }
     arr.emplace_back(nullptr);
     execv(cfg.bench.c_str(), arr.data());
@@ -198,13 +197,13 @@ int caf_main(actor_system& system, const my_config& cfg) {
   }
   auto msg = make_message(go_atom::value, child_pid);
   anon_send(dog, msg);
-  if (mem_out) 
+  if (mem_out)
     anon_send(mem_rec, msg);
   int child_exit_status = 0;
   wait(&child_exit_status);
   auto duration = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start);
   anon_send_exit(dog, exit_reason::user_shutdown);
-  if (mem_out) 
+  if (mem_out)
     anon_send_exit(mem_rec, exit_reason::user_shutdown);
   cout << "exit status: " << child_exit_status << endl;
   cout << "program did run for " << duration.count() << "ms" << endl;

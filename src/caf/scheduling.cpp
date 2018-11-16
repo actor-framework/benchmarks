@@ -111,10 +111,11 @@ bool setup(int argc, char** argv, std::string& labels_output_file,
       || mandatory_missing(res.opts, {"output", "labels", "workload"})) {
     return cout << res.error << endl << res.helptext << endl, false;
   }
-  cfg.scheduler_enable_profiling = true;
-  cfg.scheduler_profiling_ms_resolution = profiler_resolution_ms;
-  cfg.scheduler_max_threads = scheduler_threads;
-  cfg.scheduler_max_throughput = max_msg_per_run;
+  auto profiler_resolution = std::chrono::milliseconds{profiler_resolution_ms};
+  cfg.set("scheduler.enable-profiling", true);
+  cfg.set("scheduler.profiling-resolution", timespan{profiler_resolution});
+  cfg.set("scheduler.max-threads", scheduler_threads);
+  cfg.set("scheduler.max_throughput", max_msg_per_run);
   if (workload < 0 || workload > 5)
     return false;
   return true;
