@@ -99,6 +99,12 @@ message make_dynamic_message(Ts&&... xs) {
   return mb.append_all(std::forward<Ts>(xs)...).to_message();
 }
 
+template <class... Ts>
+config_value cfg_lst(Ts&&... xs) {
+  config_value::list lst{config_value{std::forward<Ts>(xs)}...};
+  return config_value{std::move(lst)};
+}
+
 struct Messages : benchmark::Fixture {
   message native_two_ints = make_message(1, 2);
   message native_two_doubles = make_message(1.0, 2.0);
@@ -111,6 +117,27 @@ struct Messages : benchmark::Fixture {
   message dynamic_two_strings = make_dynamic_message("hi", "there");
   message dynamic_one_foo = make_dynamic_message(foo{1, 2});
   message dynamic_one_bar = make_dynamic_message(bar{foo{1, 2}});
+
+  /// A message featuring a recursive data type (config_value).
+  message recursive;
+
+  /// The serialized representation of `recursive`.
+  std::vector<char> serialized_recursive;
+
+  actor_system_config cfg;
+
+  actor_system sys;
+
+  Messages() : sys(cfg.set("scheduler.policy", atom("testing"))) {
+    config_value::dictionary dict;
+    put(dict, "scheduler.policy", atom("none"));
+    put(dict, "scheduler.max-threads", 42);
+    put(dict, "nodes.preload",
+        cfg_lst("sun", "venus", "mercury", "earth", "mars"));
+    recursive = make_message(config_value{std::move(dict)});
+    binary_serializer s{sys, serialized_recursive};
+    inspect(s, recursive);
+  }
 
   behavior bhvr = behavior{
     [&](int) {
@@ -176,6 +203,28 @@ BENCHMARK_DEFINE_F(Messages, MatchDynamic)(benchmark::State& state) {
 }
 
 BENCHMARK_REGISTER_F(Messages, MatchDynamic);
+
+BENCHMARK_DEFINE_F(Messages, SerialzeRecursiveType)(benchmark::State& state) {
+  for (auto _ : state) {
+    std::vector<char> buf;
+    binary_serializer bs{sys, buf};
+    inspect(bs, recursive);
+    benchmark::DoNotOptimize(buf);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, SerialzeRecursiveType);
+
+BENCHMARK_DEFINE_F(Messages, DeserialzeRecursiveType)(benchmark::State& state) {
+  for (auto _ : state) {
+    message result;
+    binary_deserializer bd{sys, serialized_recursive};
+    inspect(bd, result);
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, DeserialzeRecursiveType);
 
 // -- utility for running streaming benchmarks ---------------------------------
 
