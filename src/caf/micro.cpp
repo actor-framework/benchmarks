@@ -121,8 +121,11 @@ struct Messages : benchmark::Fixture {
   /// A message featuring a recursive data type (config_value).
   message recursive;
 
-  /// The serialized representation of `recursive`.
-  std::vector<char> serialized_recursive;
+  /// The serialized representation of `recursive` from the binary serializer.
+  std::vector<char> binary_serialized;
+
+  /// The serialized representation of `recursive` from the stream serializer.
+  std::vector<char> stream_serialized;
 
   actor_system_config cfg;
 
@@ -135,8 +138,10 @@ struct Messages : benchmark::Fixture {
     put(dict, "nodes.preload",
         cfg_lst("sun", "venus", "mercury", "earth", "mars"));
     recursive = make_message(config_value{std::move(dict)});
-    binary_serializer s{sys, serialized_recursive};
-    inspect(s, recursive);
+    binary_serializer s1{sys, binary_serialized};
+    inspect(s1, recursive);
+    stream_serializer<vectorbuf> s2{sys, stream_serialized};
+    inspect(s2, recursive);
   }
 
   behavior bhvr = behavior{
@@ -204,27 +209,51 @@ BENCHMARK_DEFINE_F(Messages, MatchDynamic)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(Messages, MatchDynamic);
 
-BENCHMARK_DEFINE_F(Messages, SerialzeRecursiveType)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, BinarySerializer)(benchmark::State& state) {
   for (auto _ : state) {
     std::vector<char> buf;
+    buf.reserve(512);
     binary_serializer bs{sys, buf};
     inspect(bs, recursive);
     benchmark::DoNotOptimize(buf);
   }
 }
 
-BENCHMARK_REGISTER_F(Messages, SerialzeRecursiveType);
+BENCHMARK_REGISTER_F(Messages, BinarySerializer);
 
-BENCHMARK_DEFINE_F(Messages, DeserialzeRecursiveType)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, StreamSerializer)(benchmark::State& state) {
+  for (auto _ : state) {
+    std::vector<char> buf;
+    buf.reserve(512);
+    stream_serializer<vectorbuf> bs{sys, buf};
+    inspect(bs, recursive);
+    benchmark::DoNotOptimize(buf);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, StreamSerializer);
+
+BENCHMARK_DEFINE_F(Messages, BinaryDeserializer)(benchmark::State& state) {
   for (auto _ : state) {
     message result;
-    binary_deserializer bd{sys, serialized_recursive};
-    inspect(bd, result);
+    binary_deserializer source{sys, binary_serialized};
+    inspect(source, result);
     benchmark::DoNotOptimize(result);
   }
 }
 
-BENCHMARK_REGISTER_F(Messages, DeserialzeRecursiveType);
+BENCHMARK_REGISTER_F(Messages, BinaryDeserializer);
+
+BENCHMARK_DEFINE_F(Messages, StreamDeserializer)(benchmark::State& state) {
+  for (auto _ : state) {
+    message result;
+    stream_deserializer<charbuf> source{sys, stream_serialized};
+    inspect(source, result);
+    benchmark::DoNotOptimize(result);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, StreamDeserializer);
 
 // -- utility for running streaming benchmarks ---------------------------------
 
