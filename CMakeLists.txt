@@ -325,10 +325,13 @@ endif()
 #                                     CAF                                      #
 ################################################################################
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 # add targets for CAF benchmarks
 macro(add_caf_benchmark name)
   add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/${name}.cpp)
-  target_link_libraries(${name} ${CAF_LIBRARIES} ${LD_FLAGS})
+  target_link_libraries(${name} ${CAF_LIBRARIES} ${LD_FLAGS} Threads::Threads)
   add_dependencies(all_benchmarks ${name})
 endmacro()
 
@@ -366,7 +369,7 @@ find_package(Boost)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
-  target_link_libraries(to_csv ${LD_FLAGS})
+  target_link_libraries(to_csv ${LD_FLAGS} ${CAF_LIBRARIES})
 endif()
 
 if (WIN32)
