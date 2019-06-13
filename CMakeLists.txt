@@ -10,9 +10,6 @@ set(CAF_COMPILED_BENCHES "")
 
 find_package(CAF COMPONENTS core io REQUIRED)
 
-set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_CXX_FLAGS "-fsanitize=address -g -O0")
-
 include_directories(${CAF_INCLUDE_DIRS})
 
 ################################################################################
