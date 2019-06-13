@@ -47,6 +47,7 @@ struct tick_state {
 
 struct source_state : tick_state {
   const char* name = "source";
+  size_t remaining = 8000;
 };
 
 behavior source(stateful_actor<source_state>* self, bool print_rate) {
@@ -65,13 +66,21 @@ behavior source(stateful_actor<source_state>* self, bool print_rate) {
         },
         // get next element
         [=](unit_t&, downstream<string>& out, size_t num) {
-          for (size_t i = 0; i < num; ++i)
+          auto n = min(num, self->state.remaining);
+          for (size_t i = 0; i < n; ++i) {
             out.push("some data");
-          self->state.count += num;
+          }
+          self->state.remaining -=n;
+          self->state.count += n;
         },
         // check whether we reached the end
         [=](const unit_t&) {
-          return false;
+        if (self->state.remaining == 0) {
+                    self->quit();
+                    printf("DONE\n");
+                  } else
+            printf("%lu more to go\n", self->state.remaining);
+          return self->state.remaining == 0;
         }
       );
     }
@@ -130,8 +139,10 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
           self->state.count += 1;
         },
         // cleanup
-        [](unit_t&) {
+        [=](unit_t&) {
           // nop
+          self->state.tick();
+          self->quit();
         }
       );
     }
@@ -165,7 +176,7 @@ void caf_main(actor_system& sys, const config& cfg) {
       sys.spawn(sink, add_stages(sys.spawn(source, false)));
       break;
     case source_atom::uint_value():
-      sys.middleman().publish(add_stages(sys.spawn(source, true)), cfg.port);
+      sys.middleman().publish(add_stages(sys.spawn(source, false)), cfg.port);
       break;
     case sink_atom::uint_value(): {
       auto s = sys.middleman().remote_actor(cfg.host, cfg.port);
