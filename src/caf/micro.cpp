@@ -490,8 +490,8 @@ struct ManySystems : benchmark::Fixture {
   struct config : actor_system_config {
     config() {
       load<io::middleman>();
-      add_message_type_impl<stream<uint64_t>>("stream<uint64_t>");
-      add_message_type_impl<vector<uint64_t>>("vector<uint64_t>");
+      add_message_type<stream<uint64_t>>("stream<uint64_t>");
+      add_message_type<vector<uint64_t>>("vector<uint64_t>");
     }
   };
 
