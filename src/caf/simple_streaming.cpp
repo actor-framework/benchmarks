@@ -39,15 +39,15 @@ using both_atom = atom_constant<atom("both")>;
 struct tick_state {
   size_t count = 0;
 
-  void tick() {
-    cout << count << " messages/s" << endl;
+  void tick(event_based_actor* self) {
+    aout(self) << count << " messages/s" << endl;
     count = 0;
   }
 };
 
 struct source_state : tick_state {
   const char* name = "source";
-  size_t remaining = 8000;
+  size_t remaining = 50000000;
 };
 
 behavior source(stateful_actor<source_state>* self, bool print_rate) {
@@ -56,7 +56,7 @@ behavior source(stateful_actor<source_state>* self, bool print_rate) {
   return {
     [=](tick_atom) {
       self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
-      self->state.tick();
+      self->state.tick(self);
     },
     [=](start_atom) {
       return self->make_source(
@@ -65,21 +65,22 @@ behavior source(stateful_actor<source_state>* self, bool print_rate) {
           // nop
         },
         // get next element
-        [=](unit_t&, downstream<string>& out, size_t num) {
+        [=](unit_t&, downstream<int>& out, size_t num) {
           auto n = min(num, self->state.remaining);
           for (size_t i = 0; i < n; ++i) {
-            out.push("some data");
+            out.push(0xdeadbeef);
           }
           self->state.remaining -=n;
           self->state.count += n;
         },
         // check whether we reached the end
         [=](const unit_t&) {
-        if (self->state.remaining == 0) {
-                    self->quit();
-                    printf("DONE\n");
-                  } else
-            printf("%lu more to go\n", self->state.remaining);
+          if (self->state.remaining == 0) {
+            self->quit();
+            aout(self) << "[" << self->id() << "] " << "DONE" << endl;
+          } else {
+            //aout(self) << "[" << self->id() << "] " << self->state.remaining << " more to go" << endl;
+          }
           return self->state.remaining == 0;
         }
       );
@@ -93,7 +94,7 @@ struct stage_state {
 
 behavior stage(stateful_actor<stage_state>* self) {
   return {
-    [=](const stream<string>& in) {
+    [=](const stream<int>& in) {
       return self->make_stage(
         // input stream
         in,
@@ -102,7 +103,7 @@ behavior stage(stateful_actor<stage_state>* self) {
           // nop
         },
         // processing step
-        [=](unit_t&, downstream<string>& xs, string x) {
+        [=](unit_t&, downstream<int>& xs, int x) {
           xs.push(std::move(x));
         },
         // cleanup
@@ -124,9 +125,9 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
   return {
     [=](tick_atom) {
       self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
-      self->state.tick();
+      self->state.tick(self);
     },
-    [=](const stream<string>& in) {
+    [=](const stream<int>& in) {
       return self->make_sink(
         // input stream
         in,
@@ -135,13 +136,13 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
           // nop
         },
         // processing step
-        [=](unit_t&, string) {
+        [=](unit_t&, int) {
           self->state.count += 1;
         },
         // cleanup
         [=](unit_t&) {
           // nop
-          self->state.tick();
+          self->state.tick(self);
           self->quit();
         }
       );
@@ -153,13 +154,15 @@ struct config : actor_system_config {
   config() {
     opt_group{custom_options_, "global"}
     .add(mode, "mode,m", "one of 'sink', 'source', or 'both'")
+    .add(num_streams, "num-streams,s", "set number of streams, will use incremental ports")
     .add(num_stages, "num-stages,n", "number of stages after source / before sink")
     .add(port, "port,p", "sets the port of the sink (ignored in 'both' mode)")
     .add(host, "host,o", "sets the host of the sink (only in 'sink' mode)");
-    add_message_type<string>("string");
+    add_message_type<int>("int");
   }
 
   int num_stages = 0;
+  int num_streams = 1;
   uint16_t port = 0;
   string host = "localhost";
   atom_value mode;
@@ -171,21 +174,23 @@ void caf_main(actor_system& sys, const config& cfg) {
       hdl = sys.spawn(stage) * hdl;
     return hdl;
   };
-  switch (static_cast<uint64_t>(cfg.mode)) {
-    case both_atom::uint_value():
-      sys.spawn(sink, add_stages(sys.spawn(source, false)));
-      break;
-    case source_atom::uint_value():
-      sys.middleman().publish(add_stages(sys.spawn(source, false)), cfg.port);
-      break;
-    case sink_atom::uint_value(): {
-      auto s = sys.middleman().remote_actor(cfg.host, cfg.port);
-      if (!s) {
-        cerr << "cannot connect to source: " << sys.render(s.error()) << endl;
-        return;
+  for (int i = 0; i < cfg.num_streams; ++i) {
+    switch (static_cast<uint64_t>(cfg.mode)) {
+      case both_atom::uint_value():
+        sys.spawn(sink, add_stages(sys.spawn(source, false)));
+        break;
+      case source_atom::uint_value():
+        sys.middleman().publish(add_stages(sys.spawn(source, false)), cfg.port + i, nullptr, true);
+        break;
+      case sink_atom::uint_value(): {
+        auto s = sys.middleman().remote_actor(cfg.host, cfg.port + i);
+        if (!s) {
+          cerr << "cannot connect to source: " << sys.render(s.error()) << endl;
+          return;
+        }
+        sys.spawn(sink, add_stages(*s));
+        break;
       }
-      sys.spawn(sink, add_stages(*s));
-      break;
     }
   }
 }
