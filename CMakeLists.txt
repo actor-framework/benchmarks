@@ -368,7 +368,7 @@ find_package(Boost)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
-  target_link_libraries(to_csv ${LD_FLAGS})
+  target_link_libraries(to_csv ${CAF_LIBRARIES} ${LD_FLAGS})
 endif()
 
 if (WIN32)
