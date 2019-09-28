@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 
@@ -5,8 +6,6 @@
 #include <iostream>
 
 #include "caf/all.hpp"
-
-typedef unsigned char byte;
 
 using namespace std;
 using namespace caf;
@@ -21,7 +20,7 @@ int main(int argc, char* argv[]) {
   const size_t max_iterations = 250;
   const double limit          = 2.0;
   const double limit_sq       = limit * limit;
-  vector<byte> buffer(height * max_x);
+  vector<uint8_t> buffer(height * max_x);
   vector<double> cr0(8 * max_x);
   for (size_t x = 0; x < max_x; ++x) {
     for (size_t k = 0; k < 8; ++k) {
@@ -32,7 +31,7 @@ int main(int argc, char* argv[]) {
   actor_system_config cfg;
   actor_system system{cfg};
   for (size_t y = 0; y < height; ++y) {
-    byte* line = &buffer[y * max_x];
+    uint8_t* line = &buffer[y * max_x];
     system.spawn([=] {
       const double ci0 = 2.0 * y / height - 1.0;
       for (size_t x = 0; x < max_x; ++x) {
@@ -43,9 +42,9 @@ int main(int argc, char* argv[]) {
             cr[k] = cr0_x[k];
             ci[k] = ci0;
         }
-        byte bits = 0xFF;
+        uint8_t bits = 0xFF;
         for (size_t i = 0; bits && i < max_iterations; ++i) {
-          byte bit_k = 0x80;
+          uint8_t bit_k = 0x80;
           for (int k = 0; k < 8; ++k) {
             if (bits & bit_k) {
               const double cr_k    = cr[k];
