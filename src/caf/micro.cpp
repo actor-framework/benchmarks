@@ -20,10 +20,11 @@
 // this file contains some micro benchmarks
 // for various CAF implementation details
 
-#include <vector>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <tuple>
+#include <vector>
 
 #include <benchmark/benchmark.h>
 
@@ -35,6 +36,358 @@ using std::cout;
 using std::endl;
 using std::vector;
 
+namespace v2 {
+
+template <class...>
+struct msg_type_id;
+
+template <class T>
+struct get_msg_type_id;
+
+template <class T, class R, class... Ts>
+struct get_msg_type_id<R (T::*)(Ts...)> {
+  static constexpr uint16_t value = msg_type_id<std::decay_t<Ts>...>::value;
+};
+
+template <class T, class R, class... Ts>
+struct get_msg_type_id<R (T::*)(Ts...) const> {
+  static constexpr uint16_t value = msg_type_id<std::decay_t<Ts>...>::value;
+};
+
+template <class... Ts>
+struct get_msg_type_id<std::tuple<Ts...>> {
+  static constexpr uint16_t value = msg_type_id<std::decay_t<Ts>...>::value;
+};
+
+template <class T>
+constexpr uint16_t get_msg_type_id_v = get_msg_type_id<T>::value;
+
+class message_data : public caf::ref_counted {
+public:
+  message_data(uint16_t id) : id_(id) {
+    // nop
+  }
+
+  uint16_t type_id() const noexcept {
+    return id_;
+  }
+
+  virtual message_data* copy() const = 0;
+
+  virtual caf::error save(caf::serializer& sink) const = 0;
+
+private:
+  uint16_t id_;
+};
+
+template <class... Ts>
+class message_data_impl : public message_data {
+public:
+  using super = message_data;
+
+  using tuple_type = std::tuple<Ts...>;
+
+  template <class... Us>
+  message_data_impl(Us&&... xs)
+    : super(msg_type_id<Ts...>::value), content_(std::forward<Us>(xs)...) {
+    // nop
+  }
+
+  tuple_type& content() {
+    return content_;
+  }
+
+  const tuple_type& content() const {
+    return content_;
+  }
+
+  message_data_impl* copy() const override {
+    return new message_data_impl(content_);
+  }
+
+  caf::error save(caf::serializer& sink) const override {
+    return std::apply(sink, content_);
+  }
+
+  caf::error load(caf::deserializer& source) {
+    return std::apply(source, content_);
+  }
+
+private:
+  tuple_type content_;
+};
+
+template <class... Ts>
+class typed_message {
+public:
+  using tuple_type = std::tuple<Ts...>;
+
+  uint16_t type_id() const noexcept {
+    return msg_type_id<tuple_type>::value;
+  }
+
+  auto& content() {
+    return data_->content_;
+  }
+
+  constexpr operator bool() const {
+    return static_cast<bool>(data_);
+  }
+
+private:
+  caf::intrusive_cow_ptr<message_data_impl<Ts...>> data_;
+};
+
+class message {
+public:
+  using data_ptr = caf::intrusive_cow_ptr<message_data>;
+
+  uint16_t type_id() const noexcept {
+    return data_ ? data_->type_id() : 0;
+  }
+
+  message_data& data() {
+    return data_.unshared();
+  }
+
+  const message_data& data() const {
+    return *data_;
+  }
+
+  const message_data& cdata() const {
+    return *data_;
+  }
+
+  constexpr operator bool() const {
+    return static_cast<bool>(data_);
+  }
+
+  constexpr bool operator!() const {
+    return !data_;
+  }
+
+  message() noexcept = default;
+
+  explicit message(data_ptr data) noexcept : data_(std::move(data)) {
+    // nop
+  }
+
+  void reset(message_data* ptr = nullptr, bool add_ref = true) noexcept {
+    data_.reset(nullptr, add_ref);
+  }
+
+  caf::error save(caf::serializer& sink) {
+    if (data_) {
+      if (auto err = sink(type_id()))
+        return err;
+      return data_->save(sink);
+    }
+    uint16_t dummy = 0;
+    if (auto err = sink(dummy))
+      return err;
+    return caf::none;
+  }
+
+  caf::error load(caf::deserializer& source);
+
+private:
+  caf::intrusive_cow_ptr<message_data> data_;
+};
+
+template <class T>
+struct is_tuple : std::false_type {};
+
+template <class... Ts>
+struct is_tuple<std::tuple<Ts...>> : std::true_type {};
+
+template <class T>
+constexpr bool is_tuple_v = is_tuple<T>::value;
+
+template <class T, class... Ts>
+message make_message(T&& x, Ts&&... xs) {
+  if constexpr (sizeof...(Ts) == 0 && is_tuple_v<std::decay_t<T>>) {
+    return std::apply(std::forward<T>(x), [](auto&&... ys) {
+      return make_message(std::forward<decltype(ys)>(ys)...);
+    });
+  } else {
+    using impl = message_data_impl<T, std::decay_t<Ts>...>;
+    message::data_ptr ptr{
+      new impl(std::forward<T>(x), std::forward<Ts>(xs)...)};
+    return message{std::move(ptr)};
+  }
+}
+
+template <class T>
+bool holds_alternative(const message& x) noexcept {
+  return x.type_id() == msg_type_id<T>::value;
+}
+
+template <class T>
+struct fun_trait;
+
+template <class R, class... Ts>
+struct fun_trait<R(Ts...)> {
+  using arg_types = std::tuple<std::decay_t<Ts>...>;
+  using result_type = std::decay_t<R>;
+  using message_data_type = message_data_impl<std::decay_t<Ts>...>;
+};
+
+template <class T, class R, class... Ts>
+struct fun_trait<R (T::*)(Ts...)> : fun_trait<R(Ts...)> {};
+
+template <class T, class R, class... Ts>
+struct fun_trait<R (T::*)(Ts...) const> : fun_trait<R(Ts...)> {};
+
+class behavior_impl : public caf::ref_counted {
+public:
+  virtual std::optional<message> invoke(message& msg) = 0;
+};
+
+template <class... Fs>
+class default_behavior_impl : public behavior_impl {
+public:
+  std::optional<message> invoke(message& msg) override {
+    return invoke_impl(msg, std::make_index_sequence<sizeof...(Fs)>{});
+  }
+
+  default_behavior_impl(Fs... fs) : fs_(std::move(fs)...) {
+    // nop
+  }
+
+private:
+  template <size_t... Is>
+  std::optional<message> invoke_impl(message& msg, std::index_sequence<Is...>) {
+    std::optional<message> result;
+    auto dispatch = [&](auto& fun) {
+      using fun_type = std::decay_t<decltype(fun)>;
+      using trait = fun_trait<decltype(&fun_type::operator())>;
+      if (get_msg_type_id_v<typename trait::arg_types> == msg.type_id()) {
+        auto& xs = static_cast<typename trait::message_data_type&>(msg.data());
+        using fun_result = decltype(std::apply(fun, xs.content()));
+        if constexpr (std::is_same_v<void, fun_result>) {
+          std::apply(fun, xs.content());
+          result = message{};
+        } else {
+          result = make_message(std::apply(fun, xs.content()));
+        }
+        return true;
+      }
+      return false;
+    };
+    if ((dispatch(std::get<Is>(fs_)) || ...))
+      return result;
+    return std::nullopt;
+  }
+
+  std::tuple<Fs...> fs_;
+};
+
+class behavior {
+public:
+  template <class F, class = std::enable_if_t<!std::is_same_v<F, behavior>>,
+            class... Fs>
+  behavior(F f, Fs&&... fs)
+    : impl_(new default_behavior_impl<F, Fs...>(std::move(f),
+                                                std::forward<Fs>(fs)...)) {
+    // nop
+  }
+  behavior() = default;
+
+  behavior(behavior&&) = default;
+
+  behavior(const behavior&) = default;
+
+  behavior& operator=(behavior&&) = default;
+
+  behavior& operator=(const behavior&) = default;
+
+  std::optional<message> operator()(message& msg) {
+    if (!msg)
+      abort();
+    return impl_->invoke(msg);
+  }
+
+private:
+  caf::intrusive_ptr<behavior_impl> impl_;
+};
+
+struct serialization_info {
+  uint16_t id;
+  caf::error (*deserialize)(caf::deserializer&, message&);
+};
+
+struct serialization_info_list {
+  size_t size;
+  serialization_info* buf;
+  ~serialization_info_list() {
+    delete[] buf;
+  }
+};
+
+serialization_info_list s_list;
+
+size_t fill_type_registry(std::initializer_list<serialization_info> xs) {
+  if (s_list.buf == nullptr) {
+    s_list.size = xs.size();
+    s_list.buf = new serialization_info[xs.size()];
+    std::copy(xs.begin(), xs.end(), s_list.buf);
+    return xs.size();
+  }
+  auto old_size = s_list.size;
+  auto old_buf = s_list.buf;
+  s_list.size += xs.size();
+  s_list.buf = new serialization_info[s_list.size];
+  std::copy(old_buf, old_buf + old_size, s_list.buf);
+  std::copy(xs.begin(), xs.end(), s_list.buf + old_size);
+  delete[] old_buf;
+  return s_list.size;
+}
+
+const serialization_info& type_registry_entry(uint16_t id) {
+  auto first = s_list.buf;
+  auto last = first + s_list.size;
+  return *std::find_if(first, last, [id](const auto& x) { return x.id == id; });
+}
+
+template <class... Ts>
+constexpr serialization_info make_serialization_info(uint16_t id) {
+  if constexpr ((caf::allowed_unsafe_message_type<Ts>::value || ...)) {
+    return {id, nullptr};
+  } else {
+    return {id, [](caf::deserializer& source, message& x) -> caf::error {
+              using impl_type = message_data_impl<Ts...>;
+              if (x.type_id() != msg_type_id<Ts...>::value) {
+                auto ptr = caf::make_counted<impl_type>();
+                if (auto err = ptr->load(source))
+                  return err;
+                x.reset(ptr.release(), false);
+                return caf::none;
+              }
+              return static_cast<impl_type&>(x.data()).load(source);
+            }};
+  }
+}
+
+caf::error message::load(caf::deserializer& source) {
+  uint16_t id;
+  if (auto err = source(id))
+    return err;
+  if (id == 0) {
+    reset();
+    return caf::none;
+  }
+  return type_registry_entry(id).deserialize(source, *this);
+}
+
+// -- message type IDs ---------------------------------------------------------
+
+template <>
+struct msg_type_id<size_t> {
+  static constexpr uint16_t value = 99;
+};
+
+} // namespace v2
+
 using namespace caf;
 
 // -- constants and global state -----------------------------------------------
@@ -45,11 +398,11 @@ constexpr size_t num_messages = 1000000;
 
 size_t s_invoked = 0;
 
-} // namespace <anonymous>
+} // namespace
 
 // -- benchmarking of message creation -----------------------------------------
 
-void NativeMessageCreation(benchmark::State& state) {
+void NativeMessageCreation(benchmark::State &state) {
   for (auto _ : state) {
     auto msg = make_message(size_t{0});
     benchmark::DoNotOptimize(msg);
@@ -58,7 +411,16 @@ void NativeMessageCreation(benchmark::State& state) {
 
 BENCHMARK(NativeMessageCreation);
 
-void DynamicMessageCreation(benchmark::State& state) {
+void NativeMessageCreationV2(benchmark::State &state) {
+  for (auto _ : state) {
+    auto msg = v2::make_message(size_t{0});
+    benchmark::DoNotOptimize(msg);
+  }
+}
+
+BENCHMARK(NativeMessageCreationV2);
+
+void DynamicMessageCreation(benchmark::State &state) {
   for (auto _ : state) {
     message_builder mb;
     message msg = mb.append(size_t{0}).to_message();
@@ -75,7 +437,7 @@ struct foo {
   int b;
 };
 
-inline bool operator==(const foo& lhs, const foo& rhs) {
+inline bool operator==(const foo &lhs, const foo &rhs) {
   return lhs.a == rhs.a && lhs.b == rhs.b;
 }
 
@@ -84,33 +446,66 @@ struct bar {
   std::string b;
 };
 
-inline bool operator==(const bar& lhs, const bar& rhs) {
+inline bool operator==(const bar &lhs, const bar &rhs) {
   return lhs.a == rhs.a && lhs.b == rhs.b;
 }
 
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(foo)
 CAF_ALLOW_UNSAFE_MESSAGE_TYPE(bar)
 
+#define ADD_MSG_TYPE(id, ...)                                                  \
+  namespace v2 {                                                               \
+  template <>                                                                  \
+  struct msg_type_id<__VA_ARGS__> {                                            \
+    static constexpr uint16_t value = id;                                      \
+  };                                                                           \
+  }
+
+ADD_MSG_TYPE(100, int)
+ADD_MSG_TYPE(101, int, int)
+ADD_MSG_TYPE(102, double)
+ADD_MSG_TYPE(103, double, double)
+ADD_MSG_TYPE(104, std::string)
+ADD_MSG_TYPE(105, std::string, std::string)
+ADD_MSG_TYPE(106, foo)
+ADD_MSG_TYPE(107, bar)
+
+static size_t dummy = v2::fill_type_registry({
+  v2::make_serialization_info<int>(100),
+  v2::make_serialization_info<int, int>(101),
+  v2::make_serialization_info<double>(102),
+  v2::make_serialization_info<double, double>(103),
+  v2::make_serialization_info<std::string>(104),
+  v2::make_serialization_info<std::string, std::string>(105),
+});
+
 // -- pattern matching benchmark -----------------------------------------------
 
-template <class... Ts>
-message make_dynamic_message(Ts&&... xs) {
+template <class... Ts> message make_dynamic_message(Ts &&... xs) {
   message_builder mb;
   return mb.append_all(std::forward<Ts>(xs)...).to_message();
 }
 
-template <class... Ts>
-config_value cfg_lst(Ts&&... xs) {
+template <class... Ts> config_value cfg_lst(Ts &&... xs) {
   config_value::list lst{config_value{std::forward<Ts>(xs)}...};
   return config_value{std::move(lst)};
 }
 
+using namespace std::string_literals;
+
 struct Messages : benchmark::Fixture {
+
   message native_two_ints = make_message(1, 2);
   message native_two_doubles = make_message(1.0, 2.0);
   message native_two_strings = make_message("hi", "there");
   message native_one_foo = make_message(foo{1, 2});
   message native_one_bar = make_message(bar{foo{1, 2}});
+
+  v2::message v2_native_two_ints = v2::make_message(1, 2);
+  v2::message v2_native_two_doubles = v2::make_message(1.0, 2.0);
+  v2::message v2_native_two_strings = v2::make_message("hi"s, "there"s);
+  v2::message v2_native_one_foo = v2::make_message(foo{1, 2});
+  v2::message v2_native_one_bar = v2::make_message(bar{foo{1, 2}});
 
   message dynamic_two_ints = make_dynamic_message(1, 2);
   message dynamic_two_doubles = make_dynamic_message(1.0, 2.0);
@@ -121,11 +516,15 @@ struct Messages : benchmark::Fixture {
   /// A message featuring a recursive data type (config_value).
   message recursive;
 
+  std::vector<char> native_two_strings_serialized;
+
+  std::vector<char> v2_native_two_strings_serialized;
+
   /// The serialized representation of `recursive` from the binary serializer.
-  std::vector<char> binary_serialized;
+  std::vector<char> recursive_binary_serialized;
 
   /// The serialized representation of `recursive` from the stream serializer.
-  std::vector<char> stream_serialized;
+  std::vector<char> recursive_stream_serialized;
 
   actor_system_config cfg;
 
@@ -138,40 +537,47 @@ struct Messages : benchmark::Fixture {
     put(dict, "nodes.preload",
         cfg_lst("sun", "venus", "mercury", "earth", "mars"));
     recursive = make_message(config_value{std::move(dict)});
-    binary_serializer s1{sys, binary_serialized};
-    inspect(s1, recursive);
-    stream_serializer<vectorbuf> s2{sys, stream_serialized};
-    inspect(s2, recursive);
+    {
+      stream_serializer<vectorbuf> sink{sys, native_two_strings_serialized};
+      native_two_strings.save(sink);
+    }
+    {
+      stream_serializer<vectorbuf> sink{sys, v2_native_two_strings_serialized};
+      v2_native_two_strings.save(sink);
+    }
+    {
+      binary_serializer sink{sys, recursive_binary_serialized};
+      inspect(sink, recursive);
+    }
+    {
+      stream_serializer<vectorbuf> sink{sys, recursive_stream_serialized};
+      inspect(sink, recursive);
+    }
   }
 
-  behavior bhvr = behavior{
-    [&](int) {
-      s_invoked = 1;
-    },
-    [&](int, int) {
-      s_invoked = 2;
-    },
-    [&](double) {
-      s_invoked = 3;
-    },
-    [&](double, double) {
-      s_invoked = 4;
-    },
-    [&](const std::string&) {
-      s_invoked = 5;
-    },
-    [&](const std::string&, const std::string&) {
-      s_invoked = 6;
-    },
-    [&](const foo&) {
-      s_invoked = 7;
-    },
-    [&](const bar&) {
-      s_invoked = 8;
-    }
+  behavior bhvr{
+    [&](int) { s_invoked = 1; },
+    [&](int, int) { s_invoked = 2; },
+    [&](double) { s_invoked = 3; },
+    [&](double, double) { s_invoked = 4; },
+    [&](const std::string&) { s_invoked = 5; },
+    [&](const std::string&, const std::string&) { s_invoked = 6; },
+    [&](const foo&) { s_invoked = 7; },
+    [&](const bar&) { s_invoked = 8; },
   };
 
-  bool match(benchmark::State &state, message &msg,
+  v2::behavior v2_bhvr{
+    [&](int) { s_invoked = 1; },
+    [&](int, int) { s_invoked = 2; },
+    [&](double) { s_invoked = 3; },
+    [&](double, double) { s_invoked = 4; },
+    [&](const std::string&) { s_invoked = 5; },
+    [&](const std::string&, const std::string&) { s_invoked = 6; },
+    [&](const foo&) { s_invoked = 7; },
+    [&](const bar&) { s_invoked = 8; },
+  };
+
+  bool match(benchmark::State& state, message& msg,
              size_t expected_handler_id) {
     s_invoked = 0;
     bhvr(msg);
@@ -181,22 +587,47 @@ struct Messages : benchmark::Fixture {
     }
     return true;
   }
+
+  bool match(benchmark::State& state, v2::message& msg,
+             size_t expected_handler_id) {
+    s_invoked = 0;
+    v2_bhvr(msg);
+    if (s_invoked != expected_handler_id) {
+      printf("UH OH: invoked %d instead of %d!\n", (int) s_invoked,
+             (int) expected_handler_id);
+      state.SkipWithError("Wrong handler called!");
+      return false;
+    }
+    return true;
+  }
 };
 
-BENCHMARK_DEFINE_F(Messages, MatchNative)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, MatchNative)(benchmark::State &state) {
   for (auto _ : state) {
     if (!match(state, native_two_ints, 2)
         || !match(state, native_two_doubles, 4)
         || !match(state, native_two_strings, 6)
-        || !match(state, native_one_foo, 7)
-        || !match(state, native_one_bar, 8))
+        || !match(state, native_one_foo, 7) || !match(state, native_one_bar, 8))
       break;
   }
 }
 
 BENCHMARK_REGISTER_F(Messages, MatchNative);
 
-BENCHMARK_DEFINE_F(Messages, MatchDynamic)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, MatchNativeV2)(benchmark::State &state) {
+  for (auto _ : state) {
+    if (!match(state, v2_native_two_ints, 2)
+        || !match(state, v2_native_two_doubles, 4)
+        || !match(state, v2_native_two_strings, 6)
+        || !match(state, v2_native_one_foo, 7)
+        || !match(state, native_one_bar, 8))
+      break;
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, MatchNativeV2);
+
+BENCHMARK_DEFINE_F(Messages, MatchDynamic)(benchmark::State &state) {
   for (auto _ : state) {
     if (!match(state, dynamic_two_ints, 2)
         || !match(state, dynamic_two_doubles, 4)
@@ -209,7 +640,57 @@ BENCHMARK_DEFINE_F(Messages, MatchDynamic)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(Messages, MatchDynamic);
 
-BENCHMARK_DEFINE_F(Messages, BinarySerializer)(benchmark::State& state) {
+// -- serialization of simple string messages ----------------------------------
+
+BENCHMARK_DEFINE_F(Messages, SerializeStringMessage)(benchmark::State &state) {
+  for (auto _ : state) {
+    std::vector<char> buf;
+    buf.reserve(512);
+    binary_serializer bs{sys, buf};
+    native_two_strings.save(bs);
+    benchmark::DoNotOptimize(buf);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, SerializeStringMessage);
+
+BENCHMARK_DEFINE_F(Messages, SerializeStringMessageV2)(benchmark::State &state) {
+  for (auto _ : state) {
+    std::vector<char> buf;
+    buf.reserve(512);
+    binary_serializer bs{sys, buf};
+    v2_native_two_strings.save(bs);
+    benchmark::DoNotOptimize(buf);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, SerializeStringMessageV2);
+
+BENCHMARK_DEFINE_F(Messages, DeserializeStringMessage)(benchmark::State &state) {
+  for (auto _ : state) {
+    message msg;
+    binary_deserializer bs{sys, native_two_strings_serialized};
+    msg.load(bs);
+    benchmark::DoNotOptimize(msg);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, DeserializeStringMessage);
+
+BENCHMARK_DEFINE_F(Messages, DeserializeStringMessageV2)(benchmark::State &state) {
+  for (auto _ : state) {
+    v2::message msg;
+    binary_deserializer bs{sys, v2_native_two_strings_serialized};
+    msg.load(bs);
+    benchmark::DoNotOptimize(msg);
+  }
+}
+
+BENCHMARK_REGISTER_F(Messages, DeserializeStringMessageV2);
+
+// -- serialization of recursive data ------------------------------------------
+
+BENCHMARK_DEFINE_F(Messages, BinarySerializer)(benchmark::State &state) {
   for (auto _ : state) {
     std::vector<char> buf;
     buf.reserve(512);
@@ -221,7 +702,7 @@ BENCHMARK_DEFINE_F(Messages, BinarySerializer)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(Messages, BinarySerializer);
 
-BENCHMARK_DEFINE_F(Messages, StreamSerializer)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, StreamSerializer)(benchmark::State &state) {
   for (auto _ : state) {
     std::vector<char> buf;
     buf.reserve(512);
@@ -233,10 +714,10 @@ BENCHMARK_DEFINE_F(Messages, StreamSerializer)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(Messages, StreamSerializer);
 
-BENCHMARK_DEFINE_F(Messages, BinaryDeserializer)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, BinaryDeserializer)(benchmark::State &state) {
   for (auto _ : state) {
     message result;
-    binary_deserializer source{sys, binary_serialized};
+    binary_deserializer source{sys, recursive_binary_serialized};
     inspect(source, result);
     benchmark::DoNotOptimize(result);
   }
@@ -244,326 +725,15 @@ BENCHMARK_DEFINE_F(Messages, BinaryDeserializer)(benchmark::State& state) {
 
 BENCHMARK_REGISTER_F(Messages, BinaryDeserializer);
 
-BENCHMARK_DEFINE_F(Messages, StreamDeserializer)(benchmark::State& state) {
+BENCHMARK_DEFINE_F(Messages, StreamDeserializer)(benchmark::State &state) {
   for (auto _ : state) {
     message result;
-    stream_deserializer<charbuf> source{sys, stream_serialized};
+    stream_deserializer<charbuf> source{sys, recursive_stream_serialized};
     inspect(source, result);
     benchmark::DoNotOptimize(result);
   }
 }
 
 BENCHMARK_REGISTER_F(Messages, StreamDeserializer);
-
-// -- utility for running streaming benchmarks ---------------------------------
-
-void StreamingSettings(benchmark::internal::Benchmark* b) {
-  for (int i = 0; i <= 4; ++i)
-    for (int j = 1; j <= 1000000; j *= 10)
-      b->Args({i, j});
-}
-
-// -- simple integer source ----------------------------------------------------
-
-struct source_state {
-  const char* name = "source";
-};
-
-void source(stateful_actor<source_state> *self, actor dest,
-            size_t max_messages) {
-  self->make_source(
-    dest,
-    // initialize state
-    [](size_t& n) {
-      n = 0;
-    },
-    // get next element
-    [=](size_t& n, downstream<uint64_t>& out, size_t hint) {
-      auto num = std::min(hint, max_messages - n);
-      for (size_t i = 0; i < num; ++i)
-        out.push(i);
-      n += num;
-    },
-    // check whether we reached the end
-    [=](const size_t& n) {
-      return n == max_messages;
-    }
-  );
-}
-
-// -- simple integer stage -----------------------------------------------------
-
-struct stage_state {
-  const char* name = "stage";
-};
-
-behavior stage(stateful_actor<stage_state>* self) {
-  return {
-    [=](const stream<uint64_t>& in) {
-      return self->make_stage(
-        // input stream
-        in,
-        // initialize state
-        [](unit_t&) {
-          // nop
-        },
-        // processing step
-        [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
-          xs.push(x);
-        },
-        // cleanup
-        [=](unit_t&) {
-          // nop
-        }
-      );
-    }
-  };
-}
-
-// -- simple integer fork state ------------------------------------------------
-
-struct fork_state {
-  const char* name = "fork";
-};
-
-behavior fork(stateful_actor<fork_state>* self, vector<actor> sinks) {
-  auto mgr = self->make_continuous_stage(
-    // initialize state
-    [](unit_t&) {
-      // nop
-    },
-    // processing step
-    [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
-      xs.push(x);
-    },
-    // cleanup
-    [=](unit_t&) {
-      // nop
-    }
-  );
-  for (auto& snk : sinks)
-    mgr->add_outbound_path(snk);
-  return {
-    [=](stream<uint64_t> in) {
-      self->unbecome();
-      mgr->continuous(false);
-      return mgr->add_inbound_path(in);
-    }
-  };
-}
-
-// -- simple stage for building pipelines one-by-one ---------------------------
-
-struct continuous_stage_state {
-  const char* name = "continuous_stage";
-};
-
-behavior continuous_stage(stateful_actor<continuous_stage_state> *self,
-                          actor next_hop) {
-  auto mgr = self->make_continuous_stage(
-    // initialize state
-    [](unit_t&) {
-      // nop
-    },
-    // processing step
-    [=](unit_t&, downstream<uint64_t>& xs, uint64_t x) {
-      xs.push(x); },
-    // cleanup
-    [=](unit_t&) {
-      // nop
-    }
-  );
-  mgr->add_outbound_path(next_hop);
-  return {
-    [=](const stream<uint64_t>& in) {
-      mgr->add_inbound_path(in);
-    }
-  };
-}
-
-// -- simple integer sink ------------------------------------------------------
-
-struct sink_state {
-  const char* name = "sink";
-};
-
-behavior sink(stateful_actor<sink_state>* self, actor done_listener) {
-  return {
-    [=](stream<uint64_t> in) {
-      return self->make_sink(
-        // input stream
-        in,
-        // initialize state
-        [](size_t& count) {
-          count = 0;
-        },
-        // processing step
-        [=](size_t& count, uint64_t) {
-          if (++count == num_messages) {
-            self->send(done_listener, ok_atom::value);
-            count = 0;
-          }
-        },
-        // cleanup
-        [=](size_t&) {
-          // nop
-        }
-      );
-    }
-  };
-}
-
-// -- fixture for single-system streaming --------------------------------------
-
-struct SingleSystem : benchmark::Fixture {
-  actor_system_config cfg;
-  actor_system sys{cfg};
-};
-
-BENCHMARK_DEFINE_F(SingleSystem, StreamPipeline)(benchmark::State& state) {
-  for (auto _ : state) {
-    {
-      auto snk = sys.spawn(sink, actor{});
-      for (auto i = 0; i < state.range(0); ++i)
-        snk = snk * sys.spawn(stage);
-      sys.spawn(source, snk, static_cast<size_t>(state.range(1)));
-    }
-    sys.await_all_actors_done();
-  }
-}
-
-BENCHMARK_REGISTER_F(SingleSystem, StreamPipeline)
-    ->Apply(StreamingSettings);
-
-BENCHMARK_DEFINE_F(SingleSystem, StreamFork)(benchmark::State& state) {
-  for (auto _ : state) {
-    {
-      vector<actor> sinks;
-      for (auto i = 0; i < state.range(0); ++i)
-        sinks.emplace_back(sys.spawn(sink, actor{}));
-      sys.spawn(source, sys.spawn(fork, std::move(sinks)), num_messages);
-    }
-    sys.await_all_actors_done();
-  }
-}
-
-BENCHMARK_REGISTER_F(SingleSystem, StreamFork)
-    ->Apply(StreamingSettings);
-
-BENCHMARK_DEFINE_F(SingleSystem, MessagePipeline)(benchmark::State& state) {
-  auto sender = [](event_based_actor* self, actor snk) {
-    for (uint64_t i = 0; i < num_messages; ++i)
-      self->send(snk, i);
-  };
-  auto relay = [](event_based_actor* self, actor snk) -> behavior {
-    return {
-      [=](uint64_t x) {
-        self->send(snk, x);
-      }
-    };
-  };
-  auto receiver = []() -> behavior{
-    return {
-      [](uint64_t) {
-        // nop
-      }
-    };
-  };
-  for (auto _ : state) {
-    {
-      auto snk = sys.spawn(receiver);
-      for (auto i = 0; i < state.range(0); ++i)
-        snk = sys.spawn(relay, snk);
-      sys.spawn(sender, snk);
-    }
-    sys.await_all_actors_done();
-  }
-}
-
-BENCHMARK_REGISTER_F(SingleSystem, MessagePipeline)
-    ->Apply(StreamingSettings);
-
-// -- fixture for multi-system streaming ---------------------------------------
-
-template <size_t NumStages>
-struct ManySystems : benchmark::Fixture {
-  struct config : actor_system_config {
-    config() {
-      load<io::middleman>();
-      add_message_type_impl<stream<uint64_t>>("stream<uint64_t>");
-      add_message_type_impl<vector<uint64_t>>("vector<uint64_t>");
-    }
-  };
-
-  struct node {
-    config cfg;
-    actor_system sys{cfg};
-    actor hdl;
-    uint16_t port;
-  };
-
-  actor first_hop;
-
-  static constexpr size_t num_nodes = NumStages + 2;
-
-  static constexpr size_t source_node_id = 0;
-
-  static constexpr size_t sink_node_id = NumStages + 1;
-
-  std::array<node, num_nodes> nodes;
-
-  scoped_actor sink_listener;
-
-  template <class T>
-  T unbox(expected<T> x) {
-    if (!x)
-      throw std::runtime_error("unbox failed");
-    return std::move(*x);
-  }
-
-  ManySystems() : sink_listener{nodes.back().sys} {
-    uint16_t first_hop_port = 0;
-    auto& sink_node = nodes.back();
-    sink_node.hdl = sink_node.sys.spawn(sink, sink_listener);
-    sink_node.port = unbox(sink_node.sys.middleman().publish(sink_node.hdl, 0u));
-    for (size_t i = NumStages; i > 0; --i) {
-      auto& x = nodes[i];
-      auto next_hop = unbox(x.sys.middleman().remote_actor("127.0.0.1",
-                                                           nodes[i + 1].port));
-      x.hdl = x.sys.spawn(continuous_stage, next_hop);
-      x.port = unbox(x.sys.middleman().publish(x.hdl, 0u));
-    }
-    first_hop_port = nodes[1].port;
-    first_hop = unbox(nodes[0].sys.middleman().remote_actor("127.0.0.1",
-                                                            first_hop_port));
-  }
-
-  ~ManySystems() {
-    for (auto& x : nodes)
-      anon_send_exit(x.hdl, exit_reason::user_shutdown);
-  }
-
-  void run() {
-    nodes.front().sys.spawn(source, first_hop, num_messages);
-    sink_listener->receive(
-      [](ok_atom) {
-        // nop
-      }
-    );
-  }
-};
-
-#define ManySystemsStreamPipeline(num)                                         \
-  BENCHMARK_TEMPLATE_F(ManySystems, StreamPipeline_##num, num)                 \
-  (benchmark::State & state) {                                                 \
-    for (auto _ : state)                                                       \
-      run();                                                                   \
-  }
-
-ManySystemsStreamPipeline(0)
-ManySystemsStreamPipeline(1)
-ManySystemsStreamPipeline(2)
-ManySystemsStreamPipeline(3)
-ManySystemsStreamPipeline(4)
 
 BENCHMARK_MAIN();
