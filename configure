@@ -19,6 +19,7 @@ usage="\
 Usage: $0 [OPTION]... [VAR=VALUE]...
 
   Build Options:
+    --prefix=DIR                CMake install directory
     --build-dir=DIR             CMake build directory
     --build-type=STRING         CMake build type
     --with-javac=FILE           path to Java compiler
@@ -148,6 +149,9 @@ while [ $# -ne 0 ]; do
         --help|-h)
             echo "${usage}" 1>&2
             exit 1
+            ;;
+        --prefix=*)
+            append_cache_entry CMAKE_INSTALL_PREFIX PATH "$optarg"
             ;;
         --build-dir=*)
             builddir="$optarg"
