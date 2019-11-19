@@ -17,17 +17,23 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#include <list>
-#include <string>
 #include <cassert>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <cstdint>
 #include <iostream>
+#include <list>
+#include <string>
 
 #include "caf/all.hpp"
 
-using namespace std;
+using std::cerr;
+using std::cout;
+using std::endl;
+using std::list;
+using std::string;
+using std::vector;
+
 using namespace caf;
 
 using msg1_atom = atom_constant<atom("msg1")>;

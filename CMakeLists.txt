@@ -1,6 +1,38 @@
 cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
-set(CMAKE_CXX_STANDARD 11)
+
 project(benchmarks)
+
+if(NOT CMAKE_CROSSCOMPILING)
+  # Check whether the user already provided flags that enable C++ >= 17.
+  try_compile(caf_has_cxx_17
+              "${CMAKE_CURRENT_BINARY_DIR}"
+              "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check-compiler-features.cpp")
+  # Try enabling C++17 mode if user-provided flags aren't sufficient.
+  if(NOT caf_has_cxx_17)
+    if(MSVC)
+      set(cxx_flag "/std:c++17")
+    else()
+      if(CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+         AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5)
+        set(cxx_flag "-std=c++1z")
+      else()
+        set(cxx_flag "-std=c++17")
+      endif()
+    endif()
+    # Re-run compiler check.
+    try_compile(caf_has_cxx_17
+                "${CMAKE_CURRENT_BINARY_DIR}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check-compiler-features.cpp"
+                COMPILE_DEFINITIONS "${cxx_flag}"
+                OUTPUT_VARIABLE cxx_check_output)
+    if(NOT caf_has_cxx_17)
+      MESSAGE(FATAL_ERROR "\nFatal error: unable activate C++17 mode!\
+                           \nPlease see README.md for supported compilers.\
+                           \n\ntry_compile output:\n${cxx_check_output}")
+    endif()
+    add_compile_options("${cxx_flag}")
+  endif()
+endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
