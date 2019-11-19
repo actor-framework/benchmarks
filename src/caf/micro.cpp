@@ -122,10 +122,7 @@ struct Messages : benchmark::Fixture {
   message recursive;
 
   /// The serialized representation of `recursive` from the binary serializer.
-  std::vector<char> binary_serialized;
-
-  /// The serialized representation of `recursive` from the stream serializer.
-  std::vector<char> stream_serialized;
+  binary_serializer::container_type binary_serialized;
 
   actor_system_config cfg;
 
@@ -140,8 +137,6 @@ struct Messages : benchmark::Fixture {
     recursive = make_message(config_value{std::move(dict)});
     binary_serializer s1{sys, binary_serialized};
     inspect(s1, recursive);
-    stream_serializer<vectorbuf> s2{sys, stream_serialized};
-    inspect(s2, recursive);
   }
 
   behavior bhvr = behavior{
@@ -211,7 +206,7 @@ BENCHMARK_REGISTER_F(Messages, MatchDynamic);
 
 BENCHMARK_DEFINE_F(Messages, BinarySerializer)(benchmark::State& state) {
   for (auto _ : state) {
-    std::vector<char> buf;
+    binary_serializer::container_type buf;
     buf.reserve(512);
     binary_serializer bs{sys, buf};
     inspect(bs, recursive);
@@ -220,18 +215,6 @@ BENCHMARK_DEFINE_F(Messages, BinarySerializer)(benchmark::State& state) {
 }
 
 BENCHMARK_REGISTER_F(Messages, BinarySerializer);
-
-BENCHMARK_DEFINE_F(Messages, StreamSerializer)(benchmark::State& state) {
-  for (auto _ : state) {
-    std::vector<char> buf;
-    buf.reserve(512);
-    stream_serializer<vectorbuf> bs{sys, buf};
-    inspect(bs, recursive);
-    benchmark::DoNotOptimize(buf);
-  }
-}
-
-BENCHMARK_REGISTER_F(Messages, StreamSerializer);
 
 BENCHMARK_DEFINE_F(Messages, BinaryDeserializer)(benchmark::State& state) {
   for (auto _ : state) {
@@ -243,17 +226,6 @@ BENCHMARK_DEFINE_F(Messages, BinaryDeserializer)(benchmark::State& state) {
 }
 
 BENCHMARK_REGISTER_F(Messages, BinaryDeserializer);
-
-BENCHMARK_DEFINE_F(Messages, StreamDeserializer)(benchmark::State& state) {
-  for (auto _ : state) {
-    message result;
-    stream_deserializer<charbuf> source{sys, stream_serialized};
-    inspect(source, result);
-    benchmark::DoNotOptimize(result);
-  }
-}
-
-BENCHMARK_REGISTER_F(Messages, StreamDeserializer);
 
 // -- utility for running streaming benchmarks ---------------------------------
 

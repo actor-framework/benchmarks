@@ -80,16 +80,16 @@ behavior recursive_worker(event_based_actor* self, actor parent) {
   };
 }
 
-bool mandatory_missing(std::set<std::string> opts,
+bool mandatory_missing(const settings& conf,
                        std::initializer_list<std::string> xs) {
-  auto not_in_opts = [&](const std::string& x) {
-    if (opts.count(x) == 0) {
+  auto not_in_conf = [&](const std::string& x) {
+    if (!conf.contains(x)) {
       cerr << "mandatory argument missing: " << x << endl;
       return true;
     }
     return false;
   };
-  return std::any_of(xs.begin(), xs.end(), not_in_opts);
+  return std::any_of(xs.begin(), xs.end(), not_in_conf);
 }
 
 bool setup(int argc, char** argv, std::string& labels_output_file,
@@ -98,18 +98,28 @@ bool setup(int argc, char** argv, std::string& labels_output_file,
   size_t profiler_resolution_ms = 100;
   size_t scheduler_threads = std::thread::hardware_concurrency();
   size_t max_msg_per_run = std::numeric_limits<size_t>::max();
-  auto res = message_builder{argv + 1, argv + argc}.extract_opts({
-    {"output,o", "output file for profiler (mandatory)", profiler_output_file},
-    {"labels,l", "output file for labels (mandatory)", labels_output_file},
-    {"resolution,r", "profiler resolution in ms", profiler_resolution_ms},
-    {"threads,t", "number of threads for the scheduler", scheduler_threads},
-    {"max-msgs,m", "number of messages per actor run", max_msg_per_run},
-    {"workload,w", "select workload to bench (1-10) (mandatory)", workload}
-  });
-  if (!res.error.empty() || res.opts.count("help") > 0
-      || !res.remainder.empty()
-      || mandatory_missing(res.opts, {"output", "labels", "workload"})) {
-    return cout << res.error << endl << res.helptext << endl, false;
+  config_option_set options;
+  config_option_adder{options, "global"}
+    .add<bool>("help,h?", "print this help text")
+    .add(profiler_output_file, "output,o",
+         "output file for profiler (mandatory)")
+    .add(labels_output_file, "labels,l", "output file for labels (mandatory)")
+    .add(profiler_resolution_ms, "resolution,r", "profiler resolution in ms")
+    .add(scheduler_threads, "threads,t", "number of threads for the scheduler")
+    .add(max_msg_per_run, "max-msgs,m", "number of messages per actor run")
+    .add(workload, "workload,w", "select workload to bench (1-10) (mandatory)");
+  settings conf;
+  auto res = options.parse(conf, {argv + 1, argv + argc});
+  if (res.first != caf::pec::success) {
+    std::cerr << "error while parsing argument \"" << *res.second
+              << "\": " << to_string(res.first) << "\n\n";
+    std::cerr << options.help_text() << std::endl;
+    return EXIT_FAILURE;
+  }
+  if (get_or(conf, "help", false) ||
+      mandatory_missing(conf, {"output", "labels", "workload"})) {
+    cout << options.help_text() << '\n';
+    return false;
   }
   auto profiler_resolution = std::chrono::milliseconds{profiler_resolution_ms};
   cfg.set("scheduler.enable-profiling", true);
