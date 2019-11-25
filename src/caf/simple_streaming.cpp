@@ -84,8 +84,9 @@ struct stage_state {
 
 behavior stage(stateful_actor<stage_state>* self) {
   return {
-    [=](const stream<string>& in) {
-      return self->make_stage(
+    [=](stream<string> in) {
+      return attach_stream_stage(
+        self,
         // input stream
         in,
         // initialize state
@@ -93,15 +94,16 @@ behavior stage(stateful_actor<stage_state>* self) {
           // nop
         },
         // processing step
-        [=](unit_t&, downstream<string>& xs, string x) {
-          xs.push(std::move(x));
+        [=](unit_t&, downstream<string>& xs, std::vector<string>& x) {
+          // xs.push(std::move(x));
+          xs.append(std::make_move_iterator(x.begin()),
+                    std::make_move_iterator(x.end()));
         },
         // cleanup
         [](unit_t&) {
           // nop
-        }
-      );
-    }
+        });
+    },
   };
 }
 
@@ -118,7 +120,8 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
       self->state.tick();
     },
     [=](const stream<string>& in) {
-      return self->make_sink(
+      return attach_stream_sink(
+        self,
         // input stream
         in,
         // initialize state
@@ -126,15 +129,14 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
           // nop
         },
         // processing step
-        [=](unit_t&, string) {
-          self->state.count += 1;
+        [=](unit_t&, std::vector<string>& xs) {
+          self->state.count += xs.size();
         },
         // cleanup
         [](unit_t&) {
           // nop
-        }
-      );
-    }
+        });
+    },
   };
 }
 

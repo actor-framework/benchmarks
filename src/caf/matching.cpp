@@ -27,7 +27,6 @@
 
 #include "caf/all.hpp"
 
-using namespace std;
 using namespace caf;
 
 using msg1_atom = atom_constant<atom("msg1")>;
@@ -38,17 +37,17 @@ using msg5_atom = atom_constant<atom("msg5")>;
 using msg6_atom = atom_constant<atom("msg6")>;
 
 void usage() {
-  cout << "usage: matching (cow_tuple|object_array) NUM_LOOPS" << endl;
+  std::cout << "usage: matching (cow_tuple|object_array) NUM_LOOPS\n";
 }
 
 enum impl_type { static_tuple, dynamic_tuple };
 
-optional<impl_type> implproj(const string& str) {
+std::optional<impl_type> implproj(const std::string& str) {
   if (str == "cow_tuple")
     return static_tuple;
   if (str == "object_array")
     return dynamic_tuple;
-  return none;
+  return std::nullopt;
 }
 
 int main(int argc, char** argv) {
@@ -70,7 +69,7 @@ int main(int argc, char** argv) {
       if (impl == static_tuple) {
         m1 = make_message(atom("msg1"), 0);
         m2 = make_message(atom("msg2"), 0.0);
-        m3 = make_message(atom("msg3"), list<int>{0});
+        m3 = make_message(atom("msg3"), std::list<int>{0});
         m4 = make_message(atom("msg4"), 0, "0");
         m5 = make_message(atom("msg5"), 0, 0, 0);
         m6 = make_message(atom("msg6"), 0, 0.0, "0");
@@ -80,7 +79,7 @@ int main(int argc, char** argv) {
         mb.clear();
         m2 = mb.append(atom("msg2")).append(0.0).to_message();
         mb.clear();
-        m3 = mb.append(atom("msg3")).append(list<int>{0}).to_message();
+        m3 = mb.append(atom("msg3")).append(std::list<int>{0}).to_message();
         mb.clear();
         m4 = mb.append(atom("msg4")).append(0).append("0").to_message();
         mb.clear();
@@ -97,10 +96,10 @@ int main(int argc, char** argv) {
       message_handler part_fun{
         [&](msg1_atom, int) { ++m1matched; },
         [&](msg2_atom, double) { ++m2matched; },
-        [&](msg3_atom, list<int>) { ++m3matched; },
-        [&](msg4_atom, int, string) { ++m4matched; },
+        [&](msg3_atom, std::list<int>) { ++m3matched; },
+        [&](msg4_atom, int, std::string) { ++m4matched; },
         [&](msg5_atom, int, int, int) { ++m5matched; },
-        [&](msg6_atom, int, double, string) { ++m6matched; }
+        [&](msg6_atom, int, double, std::string) { ++m6matched; }
       };
       for (int64_t i = 0; i < num_loops; ++i) {
           part_fun(m1);
