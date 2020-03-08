@@ -2,7 +2,7 @@
 #
 # Use this module as follows:
 #
-#     find_package(CAF [COMPONENTS <core|io|opencl|...>*] [REQUIRED])
+#     find_package(CAF [COMPONENTS <core|io|openssl|...>*] [REQUIRED])
 #
 # Variables used by this module (they can change the default behaviour and need
 # to be set before calling find_package):
@@ -13,10 +13,9 @@
 # Variables defined by this module:
 #
 #  CAF_FOUND              System has CAF headers and library
+#  CAF_VERSION            Found CAF release number
 #  CAF_LIBRARIES          List of library files  for all components
 #  CAF_INCLUDE_DIRS       List of include paths for all components
-#  CAF_LIBRARY_$C         Library file for component $C
-#  CAF_INCLUDE_DIR_$C     Include path for component $C
 
 if(CAF_FIND_COMPONENTS STREQUAL "")
   message(FATAL_ERROR "FindCAF requires at least one COMPONENT.")
@@ -49,7 +48,8 @@ foreach (comp ${CAF_FIND_COMPONENTS})
               /usr/local/include
               /opt/local/include
               /sw/include
-              ${CMAKE_INSTALL_PREFIX}/include)
+              ${CMAKE_INSTALL_PREFIX}/include
+              ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})
   mark_as_advanced(CAF_INCLUDE_DIR_${UPPERCOMP})
   if (NOT "${CAF_INCLUDE_DIR_${UPPERCOMP}}"
       STREQUAL "CAF_INCLUDE_DIR_${UPPERCOMP}-NOTFOUND")
@@ -61,12 +61,14 @@ foreach (comp ${CAF_FIND_COMPONENTS})
                 NAMES
                   caf/detail/build_config.hpp
                 HINTS
+                  ${CAF_ROOT_DIR}
                   ${header_hints}
                   /usr/include
                   /usr/local/include
                   /opt/local/include
                   /sw/include
-                  ${CMAKE_INSTALL_PREFIX}/include)
+                  ${CMAKE_INSTALL_PREFIX}/include
+                  ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})
       if ("${caf_build_header_path}" STREQUAL "caf_build_header_path-NOTFOUND")
         message(WARNING "Found all.hpp for CAF core, but not build_config.hpp")
         set(CAF_${comp}_FOUND false)
@@ -90,7 +92,9 @@ foreach (comp ${CAF_FIND_COMPONENTS})
                      /usr/local/lib
                      /opt/local/lib
                      /sw/lib
-                     ${CMAKE_INSTALL_PREFIX}/lib)
+                     ${CMAKE_INSTALL_PREFIX}/lib
+                     ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+                     ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_BUILD_TYPE})
       mark_as_advanced(CAF_LIBRARY_${UPPERCOMP})
       if ("${CAF_LIBRARY_${UPPERCOMP}}"
           STREQUAL "CAF_LIBRARY_${UPPERCOMP}-NOTFOUND")
@@ -102,17 +106,73 @@ foreach (comp ${CAF_FIND_COMPONENTS})
   endif ()
 endforeach ()
 
-list(REMOVE_DUPLICATES CAF_INCLUDE_DIRS)
+if (DEFINED CAF_INCLUDE_DIRS)
+  list(REMOVE_DUPLICATES CAF_INCLUDE_DIRS)
+endif()
+
+
+if (NOT CAF_INCLUDE_DIR_CORE STREQUAL "CAF_INCLUDE_DIR_CORE-NOTFOUND")
+  # read content of config.hpp
+  file(READ "${CAF_INCLUDE_DIR_CORE}/caf/config.hpp" CONFIG_HPP)
+  # get line containing the version
+  string(REGEX MATCH "#define CAF_VERSION [0-9]+" VERSION_LINE "${CONFIG_HPP}")
+  # extract version number from line
+  string(REGEX MATCH "[0-9]+" VERSION_INT "${VERSION_LINE}")
+  # calculate major, minor, and patch version
+  math(EXPR CAF_VERSION_MAJOR "${VERSION_INT} / 10000")
+  math(EXPR CAF_VERSION_MINOR "( ${VERSION_INT} / 100) % 100")
+  math(EXPR CAF_VERSION_PATCH "${VERSION_INT} % 100")
+  # create full version string
+  set(CAF_VERSION "${CAF_VERSION_MAJOR}.${CAF_VERSION_MINOR}.${CAF_VERSION_PATCH}")
+  if (NOT CAF_VERSION)
+    unset(CAF_VERSION)
+    message(WARNING "Unable to determine CAF version")
+  endif ()
+endif ()
 
 # let CMake check whether all requested components have been found
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CAF
                                   FOUND_VAR CAF_FOUND
-                                  REQUIRED_VARS CAF_LIBRARIES CAF_INCLUDE_DIRS
+                                  REQUIRED_VARS CAF_VERSION CAF_LIBRARIES CAF_INCLUDE_DIRS
                                   HANDLE_COMPONENTS)
 
 # final step to tell CMake we're done
 mark_as_advanced(CAF_ROOT_DIR
+                 CAF_VERSION
                  CAF_LIBRARIES
                  CAF_INCLUDE_DIRS)
 
+if (CAF_core_FOUND AND NOT TARGET caf::core)
+  add_library(caf::core UNKNOWN IMPORTED)
+  set_target_properties(caf::core PROPERTIES
+    IMPORTED_LOCATION "${CAF_LIBRARY_CORE}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CAF_INCLUDE_DIR_CORE}")
+endif ()
+if (CAF_io_FOUND AND NOT TARGET caf::io)
+  add_library(caf::io UNKNOWN IMPORTED)
+  set_target_properties(caf::io PROPERTIES
+    IMPORTED_LOCATION "${CAF_LIBRARY_IO}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CAF_INCLUDE_DIR_IO}"
+    INTERFACE_LINK_LIBRARIES "caf::core")
+endif ()
+if (CAF_openssl_FOUND AND NOT TARGET caf::openssl)
+  add_library(caf::openssl UNKNOWN IMPORTED)
+  set_target_properties(caf::openssl PROPERTIES
+    IMPORTED_LOCATION "${CAF_LIBRARY_OPENSSL}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CAF_INCLUDE_DIR_OPENSSL}"
+    INTERFACE_LINK_LIBRARIES "caf::core;caf::io")
+  if (NOT BUILD_SHARED_LIBS)
+    include(CMakeFindDependencyMacro)
+    set(OPENSSL_USE_STATIC_LIBS TRUE)
+    find_dependency(OpenSSL)
+    set_property(TARGET caf::openssl APPEND PROPERTY
+      INTERFACE_LINK_LIBRARIES "OpenSSL::SSL")
+  endif ()
+endif ()
+if (CAF_test_FOUND AND NOT TARGET caf::test)
+  add_library(caf::test INTERFACE IMPORTED)
+  set_target_properties(caf::test PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${CAF_INCLUDE_DIR_TEST}"
+    INTERFACE_LINK_LIBRARIES "caf::core")
+endif ()

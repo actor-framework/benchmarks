@@ -24,15 +24,30 @@
 
 #include "caf/all.hpp"
 
-using namespace std;
+// TODO: use proper version check once 0.18 has an official release
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+
+CAF_BEGIN_TYPE_ID_BLOCK(actor_creation, first_custom_type_id)
+
+  CAF_ADD_ATOM(actor_creation, spread_atom);
+  CAF_ADD_ATOM(actor_creation, result_atom);
+
+CAF_END_TYPE_ID_BLOCK(actor_creation)
+
+#else // CAF_BEGIN_TYPE_ID_BLOCK
+
+using spread_atom = caf::atom_constant<caf::atom("spread")>;
+using result_atom = caf::atom_constant<caf::atom("result")>;
+static constexpr spread_atom spread_atom_v = spread_atom::value;
+static constexpr result_atom result_atom_v = result_atom::value;
+
+#endif // CAF_BEGIN_TYPE_ID_BLOCK
+
 using namespace caf;
 
 namespace {
 
 uint32_t s_num;
-
-using spread_atom = atom_constant<atom("spread")>;
-using result_atom = atom_constant<atom("result")>;
 
 } // namespace <anonymous>
 
@@ -40,11 +55,11 @@ behavior testee(event_based_actor* self, actor parent) {
   return {
     [=](spread_atom, uint32_t x) {
       if (x == 1) {
-        self->send(parent, result_atom::value, uint32_t{1});
+        self->send(parent, result_atom_v, uint32_t{1});
         self->quit();
         return;
       }
-      auto msg = make_message(spread_atom::value, x - 1);
+      auto msg = make_message(spread_atom_v, x - 1);
       self->send(self->spawn<lazy_init>(testee, self), msg);
       self->send(self->spawn<lazy_init>(testee, self), msg);
       self->become (
@@ -61,32 +76,35 @@ behavior testee(event_based_actor* self, actor parent) {
                   exit(42);
                 }
               } else {
-                self->send(parent, result_atom::value, 1 + r1 + r2);
+                self->send(parent, result_atom_v, 1 + r1 + r2);
               }
               */
-              self->send(parent, result_atom::value, 1 + r1 + r2);
+              self->send(parent, result_atom_v, 1 + r1 + r2);
               self->quit();
             }
           );
         }
       );
-    }
+    },
   };
 }
 
 void usage() {
-  cout << "usage: actor_creation POW" << endl
-       << "       creates 2^POW actors" << endl << endl;
+  std::cout << "usage: actor_creation POW\n"
+               "       creates 2^POW actors\n\n";
   exit(1);
 }
 
 int main(int argc, char** argv) {
   if (argc != 2)
     usage();
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+  init_global_meta_objects<actor_creation_type_ids>();
+#endif
   s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   actor_system_config cfg;
   cfg.parse(argc, argv, "caf-application.ini");
   actor_system system{cfg};
   scoped_actor self{system};
-  anon_send(system.spawn<lazy_init>(testee, self), spread_atom::value, s_num);
+  anon_send(system.spawn<lazy_init>(testee, self), spread_atom_v, s_num);
 }

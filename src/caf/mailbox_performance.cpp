@@ -24,10 +24,24 @@
 
 #include "caf/all.hpp"
 
-using namespace std;
-using namespace caf;
+// TODO: use proper version check once 0.18 has an official release
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
 
-using msg_atom = atom_constant<atom("msg")>;
+CAF_BEGIN_TYPE_ID_BLOCK(mailbox_performance, first_custom_type_id)
+
+  CAF_ADD_ATOM(mailbox_performance, msg_atom);
+
+CAF_END_TYPE_ID_BLOCK(mailbox_performance)
+
+#else // CAF_BEGIN_TYPE_ID_BLOCK
+
+using msg_atom = caf::atom_constant<caf::atom("msg")>;
+
+static constexpr msg_atom msg_atom_v = msg_atom::value;
+
+#endif // CAF_BEGIN_TYPE_ID_BLOCK
+
+using namespace caf;
 
 namespace {
 
@@ -56,14 +70,14 @@ class receiver : public event_based_actor {
 
 
 void sender(actor whom, uint64_t count) {
-  auto msg = make_message(msg_atom::value);
+  auto msg = make_message(msg_atom_v);
   for (uint64_t i = 0; i < count; ++i)
     anon_send(whom, msg);
 }
 
 int usage() {
-  return cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD"
-              << endl << endl, 1;
+  std::cout << "usage: mailbox_performance NUM_THREADS MSGS_PER_THREAD\n\n";
+  return 1;
 }
 
 void run(int argc, char** argv, uint64_t num_sender, uint64_t num_msgs) {
@@ -81,6 +95,9 @@ void run(int argc, char** argv, uint64_t num_sender, uint64_t num_msgs) {
 int main(int argc, char** argv) {
   if (argc != 3)
     return usage();
-  run(argc, argv, static_cast<uint64_t>(stoll(argv[1])),
-      static_cast<uint64_t>(stoll(argv[2])));
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+  init_global_meta_objects<mailbox_performance_type_ids>();
+#endif
+  run(argc, argv, static_cast<uint64_t>(std::stoll(argv[1])),
+      static_cast<uint64_t>(std::stoll(argv[2])));
 }

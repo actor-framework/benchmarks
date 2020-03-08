@@ -396,12 +396,14 @@ set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
 #                                    tools                                     #
 ################################################################################
 
-find_package(Boost)
-if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
-  target_link_libraries(to_csv ${CAF_LIBRARIES} ${LD_FLAGS})
-endif()
+# TODO: older versions of Boost still use auto_ptr and fail to compile with
+#       C++17
+# find_package(Boost)
+# if(Boost_FOUND)
+#   include_directories(${Boost_INCLUDE_DIRS})
+#   add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
+#   target_link_libraries(to_csv ${CAF_LIBRARIES} ${LD_FLAGS})
+# endif()
 
 if (WIN32)
   message(STATUS "skip caf_run_bench (not supported on Windows)")

@@ -19,18 +19,39 @@
 # include <mach/kern_return.h>
 #endif
 
-using namespace std;
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+
+CAF_BEGIN_TYPE_ID_BLOCK(run_bench, first_custom_type_id)
+
+  CAF_ADD_ATOM(run_bench, go_atom);
+  CAF_ADD_ATOM(run_bench, poll_atom);
+
+CAF_END_TYPE_ID_BLOCK(run_bench)
+
+#else
+
+using go_atom = caf::atom_constant<caf::atom("go")>;
+using poll_atom = caf::atom_constant<caf::atom("poll")>;
+using timeout_atom = caf::atom_constant<caf::atom("timeout")>;
+constexpr go_atom go_atom_v = go_atom::value;
+constexpr poll_atom poll_atom_v = poll_atom::value;
+constexpr timeout_atom timeout_atom_v = timeout_atom::value;
+
+#endif
+
 using namespace caf;
 
-using go_atom = atom_constant<atom("go")>;
-using poll_atom = atom_constant<atom("poll")>;
-using timeout_atom = atom_constant<atom("timeout")>;
+using std::string;
 
-namespace { decltype(chrono::system_clock::now()) s_start; }
+namespace {
+
+decltype(std::chrono::system_clock::now()) s_start;
+
+} // namespace
 
 #ifdef __APPLE__
 template <class OutStream>
-bool print_rss(OutStream& out, string&, const string&, pid_t child) {
+bool print_rss(OutStream& out, std::string&, const string&, pid_t child) {
   task_t child_task;
   if (task_for_pid(mach_task_self(), child, &child_task) != KERN_SUCCESS) {
     return false;
@@ -43,25 +64,25 @@ bool print_rss(OutStream& out, string&, const string&, pid_t child) {
   auto rss = static_cast<unsigned long long>(basic_info.resident_size);
   auto rss_kb = rss / 1024;
   // type is mach_vm_size_t
-  out << chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start).count()
+  out << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - s_start).count()
       << " "
-      << rss_kb << endl;
+      << rss_kb << std::endl;
   return true;
 }
 #elif defined(__linux__)
 template <class OutStream>
 bool print_rss(OutStream& out, string& line, const string& proc_file, pid_t) {
-  ifstream statfile(proc_file);
-  while (getline(statfile, line)) {
+  std::ifstream statfile(proc_file);
+  while (std::getline(statfile, line)) {
     if (line.compare(0, 6, "VmRSS:") == 0) {
       auto first = line.c_str() + 6; // skip "VmRSS:"
-      auto rss = strtoll(first, NULL, 10);
+      auto rss = std::strtoll(first, NULL, 10);
       if (line.compare(line.size() - 2, 2, "kB") != 0) {
-        cerr << "VmRSS is *NOT* in kB" << endl;
+        std::cerr << "VmRSS is *NOT* in kB" << std::endl;
       }
-      out << chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start).count()
+      out << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - s_start).count()
           << " "
-          << rss << endl;
+          << rss << std::endl;
       return true;
     }
   }
@@ -78,7 +99,7 @@ void watchdog(blocking_actor* self, int max_runtime) {
       child = child_pid;
     }
   );
-  self->delayed_send(self, chrono::seconds(max_runtime), timeout_atom::value);
+  self->delayed_send(self, std::chrono::seconds(max_runtime), timeout_atom_v);
   self->receive(
     [=](timeout_atom) {
       kill(child, 9);
@@ -103,21 +124,20 @@ void memrecord(blocking_actor* self, int poll_interval, std::ostream* out_ptr) {
   );
   fname += std::to_string(child);
   fname += "/status";
-  self->send(self, poll_atom::value);
+  self->send(self, poll_atom_v);
   bool running = true;
   self->receive_while(running)(
     [&](poll_atom) {
-      self->delayed_send(self, chrono::milliseconds(poll_interval),
-                         poll_atom::value);
+      self->delayed_send(self, std::chrono::milliseconds(poll_interval),
+                         poll_atom_v);
       print_rss(out , line_buf, fname, child);
     },
     [&](const exit_msg& msg) {
       if (msg.reason) {
-       self->fail_state(std::move(msg.reason));
-       running = false;
+        self->fail_state(std::move(msg.reason));
+        running = false;
       }
-    }
-  );
+    });
 }
 
 namespace {
@@ -145,15 +165,19 @@ public:
 
 void init_fstream(const string& fname, std::fstream& fs) {
   if (!fname.empty()) {
-    fs.open(fname, ios_base::out | ios_base::app);
+    fs.open(fname, std::ios_base::out | std::ios_base::app);
     if (!fs) {
-      cerr << "unable to open file for runtime output: " << fname << endl;
+      std::cerr << "unable to open file for runtime output: " << fname
+                << std::endl;
       exit(1);
     }
   }
 }
 
 int caf_main(actor_system& system, const my_config& cfg) {
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+  init_global_meta_objects<run_bench_type_ids>();
+#endif
   std::fstream runtime_out;
   std::fstream mem_out;
   init_fstream(cfg.runtime_out_fname, runtime_out);
@@ -164,16 +188,16 @@ int caf_main(actor_system& system, const my_config& cfg) {
   actor mem_rec;
   if (mem_out)
     mem_rec = system.spawn<detached>(memrecord, cfg.mem_poll_interval, &mem_out_buf);
-  cout << "fork into " << cfg.bench << endl;
+  std::cout << "fork into " << cfg.bench << std::endl;
   pid_t child_pid = fork();
   if (child_pid < 0) {
-    cerr << "fork failed" << endl,
+    std::cerr << "fork failed" << std::endl,
     abort();
   }
-  s_start = chrono::system_clock::now();
+  s_start = std::chrono::system_clock::now();
   if (child_pid == 0) {
     if (setuid(static_cast<uid_t>(cfg.userid)) != 0) {
-      cerr << "could not set userid to " << cfg.userid << endl;
+      std::cerr << "could not set userid to " << cfg.userid << std::endl;
       exit(1);
     }
     // make sure $HOME is set properly (evaluated by Erlang)
@@ -181,10 +205,10 @@ int caf_main(actor_system& system, const my_config& cfg) {
     std::string env_cmd = "HOME=";
     env_cmd += pw->pw_dir;
     if (putenv(&env_cmd[0]) != 0) {
-      cerr << "could net set HOME to " << pw->pw_dir << endl;
+      std::cerr << "could net set HOME to " << pw->pw_dir << std::endl;
       exit(1);
     }
-    vector<char*> arr;
+    std::vector<char*> arr;
     arr.emplace_back(const_cast<char*>(cfg.bench.c_str()));
     for (size_t i = 0; i < cfg.remainder.size(); ++i) {
       arr.emplace_back(const_cast<char *>(cfg.remainder[i].c_str()));
@@ -192,27 +216,27 @@ int caf_main(actor_system& system, const my_config& cfg) {
     arr.emplace_back(nullptr);
     execv(cfg.bench.c_str(), arr.data());
     // should be unreachable
-    cerr << "execv failed" << endl;
+    std::cerr << "execv failed" << std::endl;
     abort();
   }
-  auto msg = make_message(go_atom::value, child_pid);
+  auto msg = make_message(go_atom_v, child_pid);
   anon_send(dog, msg);
   if (mem_out)
     anon_send(mem_rec, msg);
   int child_exit_status = 0;
   wait(&child_exit_status);
-  auto duration = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - s_start);
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - s_start);
   anon_send_exit(dog, exit_reason::user_shutdown);
   if (mem_out)
     anon_send_exit(mem_rec, exit_reason::user_shutdown);
-  cout << "exit status: " << child_exit_status << endl;
-  cout << "program did run for " << duration.count() << "ms" << endl;
+  std::cout << "exit status: " << child_exit_status << std::endl;
+  std::cout << "program did run for " << duration.count() << "ms" << std::endl;
   system.await_all_actors_done();
   if (child_exit_status == 0) {
     if (runtime_out)
-      runtime_out << duration.count() << endl;
+      runtime_out << duration.count() << std::endl;
     if (mem_out)
-      mem_out << mem_out_buf.str() << flush;
+      mem_out << mem_out_buf.str() << std::flush;
   }
   return child_exit_status;
 }

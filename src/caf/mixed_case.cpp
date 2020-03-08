@@ -20,10 +20,33 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
 #include <functional>
+#include <iostream>
 
 #include "caf/all.hpp"
+
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+
+CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
+
+  CAF_ADD_TYPE_ID(mixed_case, (std::vector<uint64_t>) );
+
+  CAF_ADD_ATOM(mixed_case, calc_atom);
+  CAF_ADD_ATOM(mixed_case, done_atom);
+  CAF_ADD_ATOM(mixed_case, token_atom);
+
+CAF_END_TYPE_ID_BLOCK(mixed_case)
+
+#else
+
+using calc_atom = caf::atom_constant<caf::atom("calc")>;
+using token_atom = caf::atom_constant<caf::atom("token")>;
+using done_atom = caf::atom_constant<caf::atom("done")>;
+static constexpr calc_atom calc_atom_v = calc_atom::value;
+static constexpr token_atom token_atom_v = token_atom::value;
+static constexpr done_atom done_atom_v = done_atom::value;
+
+#endif
 
 using std::cout;
 using std::endl;
@@ -37,10 +60,6 @@ using factors = std::vector<uint64_t>;
 constexpr uint64_t s_factor1 = 86028157;
 constexpr uint64_t s_factor2 = 329545133;
 constexpr uint64_t s_task_n = s_factor1 * s_factor2;
-
-using calc_atom = atom_constant<atom("calc")>;
-using done_atom = atom_constant<atom("done")>;
-using token_atom = atom_constant<atom("token")>;
 
 factors factorize(uint64_t n) {
   factors result;
@@ -62,22 +81,18 @@ factors factorize(uint64_t n) {
 }
 
 inline void check_factors(const factors& vec) {
-    assert(vec.size() == 2);
-    assert(vec[0] == s_factor1);
-    assert(vec[1] == s_factor2);
-#   ifdef NDEBUG
-    static_cast<void>(vec);
-#   endif
+  assert(vec.size() == 2);
+  assert(vec[0] == s_factor1);
+  assert(vec[1] == s_factor2);
+#ifdef NDEBUG
+  static_cast<void>(vec);
+#endif
 }
 
 behavior worker(event_based_actor* self) {
   return {
-    [](calc_atom, uint64_t what) {
-      return factorize(what);
-    },
-    [=](done_atom) {
-      self->quit();
-    }
+    [](calc_atom, uint64_t what) { return factorize(what); },
+    [=](done_atom) { self->quit(); },
   };
 }
 
@@ -87,51 +102,51 @@ behavior chain_link(event_based_actor* self, const actor& next) {
       if (value == 0)
         self->quit();
       self->delegate(next, tk, value);
-    }
+    },
   };
 }
 
 class chain_master : public event_based_actor {
- public:
-    chain_master(actor_config& cfg, actor coll, int rs, uint64_t itv, int n)
-      : event_based_actor(cfg),
-        iteration_(0),
-        ring_size_(rs),
-        m_initial_token_value(itv),
-        num_iterations_(n),
-        mc_(coll),
-        next_(this),
-        factorizer_(spawn<detached>(worker)) {
-      // nop
-    }
+public:
+  chain_master(actor_config& cfg, actor coll, int rs, uint64_t itv, int n)
+    : event_based_actor(cfg),
+      iteration_(0),
+      ring_size_(rs),
+      m_initial_token_value(itv),
+      num_iterations_(n),
+      mc_(coll),
+      next_(this),
+      factorizer_(spawn<detached>(worker)) {
+    // nop
+  }
 
-    behavior make_behavior() override {
-      new_ring();
-      return {
-        [=](token_atom tk, uint64_t value) {
-          if (value == 0) {
-            if (++iteration_ < num_iterations_) {
-              new_ring();
-            } else {
-              send(factorizer_, done_atom::value);
-              send(mc_, done_atom::value);
-              quit();
-            }
+  behavior make_behavior() override {
+    new_ring();
+    return {
+      [=](token_atom tk, uint64_t value) {
+        if (value == 0) {
+          if (++iteration_ < num_iterations_) {
+            new_ring();
           } else {
-            value -= 1;
-            delegate(next_, tk, value);
+            send(factorizer_, done_atom_v);
+            send(mc_, done_atom_v);
+            quit();
           }
+        } else {
+          value -= 1;
+          delegate(next_, tk, value);
         }
-      };
-    }
+      },
+    };
+  }
 
- private:
+private:
   void new_ring() {
-    send_as(mc_, factorizer_, calc_atom::value, s_task_n);
+    send_as(mc_, factorizer_, calc_atom_v, s_task_n);
     next_ = this;
     for (int i = 1; i < ring_size_; ++i)
       next_ = spawn<lazy_init>(chain_link, next_);
-    send(next_, token_atom::value, m_initial_token_value);
+    send(next_, token_atom_v, m_initial_token_value);
   }
   int iteration_;
   int ring_size_;
@@ -143,10 +158,9 @@ class chain_master : public event_based_actor {
 };
 
 class supervisor : public event_based_actor {
- public:
+public:
   supervisor(actor_config& cfg, int num_msgs)
-      : event_based_actor(cfg),
-        left_(num_msgs) {
+    : event_based_actor(cfg), left_(num_msgs) {
     // nop
   }
 
@@ -160,33 +174,35 @@ class supervisor : public event_based_actor {
       [=](done_atom) {
         if (--left_ == 0)
           quit();
-      }
+      },
     };
   }
 
- private:
+private:
   int left_;
 };
 
-} // namespace <anonymous>
+} // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 5)
-    return cout << "usage: mixed_case "
-                   "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS"
-                << endl << endl, 1;
+  if (argc != 5) {
+    cout << "usage: mixed_case "
+            "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS\n\n";
+    return 1;
+  }
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+  init_global_meta_objects<mixed_case_type_ids>();
+#endif
   auto num_rings = atoi(argv[1]);
   auto ring_size = atoi(argv[2]);
   auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
   auto repetitions = atoi(argv[4]);
   actor_system_config cfg;
   cfg.parse(argc, argv, "caf-application.ini");
-  cfg.add_message_type<factors>("factors");
   actor_system system{cfg};
   auto sv = system.spawn<supervisor, lazy_init>(num_rings
                                                 + (num_rings * repetitions));
   for (int i = 0; i < num_rings; ++i)
     system.spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
 }
-
 

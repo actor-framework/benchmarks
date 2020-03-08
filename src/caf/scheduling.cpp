@@ -22,14 +22,28 @@
 
 #include "caf/all.hpp"
 
-#include "caf/scheduler/profiled_coordinator.hpp"
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
 
-using namespace std;
+CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
+
+  CAF_ADD_TYPE_ID(mixed_case, (std::chrono::high_resolution_clock::time_point))
+
+  CAF_ADD_ATOM(mixed_case, task_atom)
+  CAF_ADD_ATOM(mixed_case, result_atom)
+
+CAF_END_TYPE_ID_BLOCK(mixed_case)
+
+#else
+
+using task_atom = caf::atom_constant<caf::atom("task")>;
+using result_atom = caf::atom_constant<caf::atom("result")>;
+constexpr task_atom task_atom_v = task_atom::value;
+constexpr result_atom result_atom_v = result_atom::value;
+
+#endif
+
 using namespace caf;
 using namespace std::chrono;
-
-using task_atom = atom_constant<atom("task")>;
-using result_atom = atom_constant<atom("result")>;
 
 template <class T>
 auto ms(T x, T y) -> decltype(duration_cast<milliseconds>(y - x).count()) {
@@ -39,7 +53,7 @@ auto ms(T x, T y) -> decltype(duration_cast<milliseconds>(y - x).count()) {
 using hrc = high_resolution_clock;
 
 behavior task_worker(event_based_actor* self) {
-  aout(self) << self->id() << " task_worker_" << self->id() << endl;
+  aout(self) << self->id() << " task_worker_" << self->id() << std::endl;
   return {
     [=](task_atom, int complexity, hrc::time_point) -> int {
       //aout(self) << "delay until received: " << ms(ts, hrc::now()) << endl;
@@ -59,18 +73,18 @@ behavior recursive_worker(event_based_actor* self, actor parent) {
   return {
     [=](task_atom, uint32_t x) {
       if (x == 1) {
-        self->send(parent, result_atom::value, uint32_t{1});
+        self->send(parent, result_atom_v, uint32_t{1});
         self->quit();
         return;
       }
-      auto msg = make_message(task_atom::value, x - 1);
+      auto msg = make_message(task_atom_v, x - 1);
       self->send(self->spawn<lazy_init>(recursive_worker, self), msg);
       self->send(self->spawn<lazy_init>(recursive_worker, self), msg);
       self->become (
         [=](result_atom, uint32_t r1) {
           self->become (
             [=](result_atom, uint32_t r2) {
-              self->send(parent, result_atom::value, 1 + r1 + r2);
+              self->send(parent, result_atom_v, 1 + r1 + r2);
               self->quit();
             }
           );
@@ -84,7 +98,7 @@ bool mandatory_missing(const settings& conf,
                        std::initializer_list<std::string> xs) {
   auto not_in_conf = [&](const std::string& x) {
     if (!conf.contains(x)) {
-      cerr << "mandatory argument missing: " << x << endl;
+      std::cerr << "mandatory argument missing: " << x << std::endl;
       return true;
     }
     return false;
@@ -118,7 +132,7 @@ bool setup(int argc, char** argv, std::string& labels_output_file,
   }
   if (get_or(conf, "help", false) ||
       mandatory_missing(conf, {"output", "labels", "workload"})) {
-    cout << options.help_text() << '\n';
+    std::cout << options.help_text() << '\n';
     return false;
   }
   auto profiler_resolution = std::chrono::milliseconds{profiler_resolution_ms};
@@ -136,13 +150,13 @@ CAF_ALLOW_UNSAFE_MESSAGE_TYPE(decltype(hrc::now()))
 /// Spawn 20 `task_worker` and give them work,
 /// the work has variation in its complexity (0 to 4)
 void impl1(actor_system& system) {
-  vector<actor> workers;
+  std::vector<actor> workers;
   for (int i = 0; i < 20; ++i)
     workers.push_back(system.spawn<lazy_init>(task_worker));
   for (int j = 0; j < 10; ++j)
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
-        anon_send(w, task_atom::value, i, hrc::now());
+        anon_send(w, task_atom_v, i, hrc::now());
   for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
 }
@@ -151,7 +165,7 @@ void impl1(actor_system& system) {
 void impl2(actor_system& system) {
   scoped_actor self{system};
   auto root = system.spawn(recursive_worker, self);
-  anon_send(root, task_atom::value, uint32_t{15});
+  anon_send(root, task_atom_v, uint32_t{15});
 }
 
 /// Spawn 20 `task_worker`and give them work,
@@ -159,15 +173,15 @@ void impl2(actor_system& system) {
 /// In addition, this will spawn 2^15 `recursive_worker`
 void impl3(actor_system& system) {
   scoped_actor self{system};
-  vector<actor> workers;
+  std::vector<actor> workers;
   for (int i = 0; i < 20; ++i)
     workers.push_back(system.spawn<lazy_init>(task_worker));
   for (int j = 0; j < 10; ++j)
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
-        anon_send(w, task_atom::value, i, hrc::now());
+        anon_send(w, task_atom_v, i, hrc::now());
   auto root = system.spawn(recursive_worker, self);
-  anon_send(root, task_atom::value, uint32_t{15});
+  anon_send(root, task_atom_v, uint32_t{15});
   for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
   anon_send_exit(root, exit_reason::user_shutdown);
@@ -178,13 +192,13 @@ void impl3(actor_system& system) {
 /// repeated 10 times.
 void impl4(actor_system& system) {
   scoped_actor self{system};
-  vector<actor> workers;
+  std::vector<actor> workers;
   for (int j = 0; j < 10; ++j) {
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
-        anon_send(w, task_atom::value, i, hrc::now());
+        anon_send(w, task_atom_v, i, hrc::now());
     auto root = system.spawn(recursive_worker, self);
-    anon_send(root, task_atom::value, uint32_t{15});
+    anon_send(root, task_atom_v, uint32_t{15});
     for (int i = 0; i < 5; ++i)
       workers.push_back(system.spawn<lazy_init>(task_worker));
     anon_send_exit(root, exit_reason::user_shutdown);
@@ -202,7 +216,7 @@ void impl5(actor_system& system) {
   };
   auto pool = actor_pool::make(system.dummy_execution_unit(),
                                5, factory, actor_pool::broadcast());
-  anon_send(pool, task_atom::value, uint32_t{15});
+  anon_send(pool, task_atom_v, uint32_t{15});
   auto factory_task = [&] {
     return system.spawn(task_worker);
   };
@@ -210,7 +224,7 @@ void impl5(actor_system& system) {
                                 5, factory_task, actor_pool::broadcast());
   for (int j = 0; j < 10; ++j) {
     for (int i = 0; i < 9; ++i) {
-      anon_send(pool2, task_atom::value, i, hrc::now());
+      anon_send(pool2, task_atom_v, i, hrc::now());
     }
   }
   anon_send_exit(pool2, exit_reason::user_shutdown);
@@ -224,12 +238,12 @@ void impl6(actor_system& system) {
   for (int i = 0; i < 20; ++i) {
     if (i % 2) {
       anon_send(system.spawn(recursive_worker, self),
-                task_atom::value, uint32_t{15});
+                task_atom_v, uint32_t{15});
     } else {
       auto pool = actor_pool::make(system.dummy_execution_unit(), 10,
                                    [&]{ return system.spawn(task_worker); },
                                    actor_pool::broadcast());
-      anon_send(pool, task_atom::value, i, hrc::now());
+      anon_send(pool, task_atom_v, i, hrc::now());
       anon_send_exit(pool, exit_reason::user_shutdown);
     }
   }

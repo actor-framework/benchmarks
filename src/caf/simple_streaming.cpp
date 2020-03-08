@@ -25,22 +25,37 @@
 #include "caf/all.hpp"
 #include "caf/io/all.hpp"
 
-using namespace std;
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+
+CAF_BEGIN_TYPE_ID_BLOCK(simple_streaming, first_custom_type_id)
+
+  CAF_ADD_TYPE_ID(simple_streaming, (caf::stream<std::string>) )
+  CAF_ADD_TYPE_ID(simple_streaming, (std::vector<std::string>) )
+
+  CAF_ADD_ATOM(simple_streaming, start_atom);
+
+CAF_END_TYPE_ID_BLOCK(simple_streaming)
+
+#else
+
+using start_atom = caf::atom_constant<caf::atom("start")>;
+
+static constexpr start_atom start_atom_v = start_atom::value;
+
+#endif
+
 using namespace caf;
+using namespace std::chrono_literals;
+
+using std::string;
 
 namespace {
-
-using start_atom = atom_constant<atom("start")>;
-using tick_atom = atom_constant<atom("tick")>;
-using sink_atom = atom_constant<atom("sink")>;
-using source_atom = atom_constant<atom("source")>;
-using both_atom = atom_constant<atom("both")>;
 
 struct tick_state {
   size_t count = 0;
 
   void tick() {
-    cout << count << " messages/s" << endl;
+    std::cout << count << " messages/s\n";
     count = 0;
   }
 };
@@ -51,10 +66,10 @@ struct source_state : tick_state {
 
 behavior source(stateful_actor<source_state>* self, bool print_rate) {
   if (print_rate)
-    self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
+    self->delayed_send(self, 1s, tick_atom_v);
   return {
     [=](tick_atom) {
-      self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
+      self->delayed_send(self, 1s, tick_atom_v);
       self->state.tick();
     },
     [=](start_atom) {
@@ -74,7 +89,7 @@ behavior source(stateful_actor<source_state>* self, bool print_rate) {
           return false;
         }
       );
-    }
+    },
   };
 }
 
@@ -110,11 +125,11 @@ struct sink_state : tick_state {
 };
 
 behavior sink(stateful_actor<sink_state>* self, actor src) {
-  self->send(self * src, start_atom::value);
-  self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
+  self->send(self * src, start_atom_v);
+  self->delayed_send(self, std::chrono::seconds(1), tick_atom_v);
   return {
     [=](tick_atom) {
-      self->delayed_send(self, std::chrono::seconds(1), tick_atom::value);
+      self->delayed_send(self, std::chrono::seconds(1), tick_atom_v);
       self->state.tick();
     },
     [=](const stream<string>& in) {
@@ -140,18 +155,23 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
 
 struct config : actor_system_config {
   config() {
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+    io::middleman::init_global_meta_objects();
+    init_global_meta_objects<simple_streaming_type_ids>();
+#else
+    add_message_type<string>("string");
+#endif
     opt_group{custom_options_, "global"}
     .add(mode, "mode,m", "one of 'sink', 'source', or 'both'")
     .add(num_stages, "num-stages,n", "number of stages after source / before sink")
     .add(port, "port,p", "sets the port of the sink (ignored in 'both' mode)")
     .add(host, "host,o", "sets the host of the sink (only in 'sink' mode)");
-    add_message_type<string>("string");
   }
 
   int num_stages = 0;
   uint16_t port = 0;
   string host = "localhost";
-  atom_value mode;
+  std::string mode;
 };
 
 void caf_main(actor_system& sys, const config& cfg) {
@@ -160,22 +180,18 @@ void caf_main(actor_system& sys, const config& cfg) {
       hdl = sys.spawn(stage) * hdl;
     return hdl;
   };
-  switch (static_cast<uint64_t>(cfg.mode)) {
-    case both_atom::uint_value():
-      sys.spawn(sink, add_stages(sys.spawn(source, false)));
-      break;
-    case source_atom::uint_value():
-      sys.middleman().publish(add_stages(sys.spawn(source, true)), cfg.port);
-      break;
-    case sink_atom::uint_value(): {
-      auto s = sys.middleman().remote_actor(cfg.host, cfg.port);
-      if (!s) {
-        cerr << "cannot connect to source: " << sys.render(s.error()) << endl;
-        return;
-      }
-      sys.spawn(sink, add_stages(*s));
-      break;
+  if (cfg.mode == "both") {
+    sys.spawn(sink, add_stages(sys.spawn(source, false)));
+  } else if (cfg.mode == "source") {
+    sys.middleman().publish(add_stages(sys.spawn(source, true)), cfg.port);
+  } else if (cfg.mode == "sink") {
+    auto s = sys.middleman().remote_actor(cfg.host, cfg.port);
+    if (!s) {
+      std::cerr << "cannot connect to source: " << sys.render(s.error())
+                << std::endl;
+      return;
     }
+    sys.spawn(sink, add_stages(*s));
   }
 }
 

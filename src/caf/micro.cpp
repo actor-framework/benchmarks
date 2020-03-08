@@ -30,6 +30,27 @@
 #include "caf/all.hpp"
 #include "caf/io/all.hpp"
 
+struct bar;
+struct foo;
+
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+
+CAF_BEGIN_TYPE_ID_BLOCK(micro, first_custom_type_id)
+
+  CAF_ADD_TYPE_ID(micro, (bar));
+  CAF_ADD_TYPE_ID(micro, (foo));
+
+  CAF_ADD_TYPE_ID(micro, (caf::stream<uint64_t>) );
+  CAF_ADD_TYPE_ID(micro, (std::vector<uint64_t>) );
+
+CAF_END_TYPE_ID_BLOCK(micro)
+
+caf::string_view atom(caf::string_view str) {
+  return str;
+}
+
+#endif
+
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -372,7 +393,7 @@ behavior sink(stateful_actor<sink_state>* self, actor done_listener) {
         // processing step
         [=](size_t& count, uint64_t) {
           if (++count == num_messages) {
-            self->send(done_listener, ok_atom::value);
+            self->send(done_listener, ok_atom_v);
             count = 0;
           }
         },
@@ -462,8 +483,12 @@ struct ManySystems : benchmark::Fixture {
   struct config : actor_system_config {
     config() {
       load<io::middleman>();
+#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+      init_global_meta_objects<micro_type_ids>();
+#else
       add_message_type_impl<stream<uint64_t>>("stream<uint64_t>");
       add_message_type_impl<vector<uint64_t>>("vector<uint64_t>");
+#endif
     }
   };
 
