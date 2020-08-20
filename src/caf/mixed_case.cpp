@@ -191,7 +191,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 #ifdef CAF_BEGIN_TYPE_ID_BLOCK
-  init_global_meta_objects<mixed_case_type_ids>();
+  init_global_meta_objects<caf::id_block::mixed_case>();
 #endif
   auto num_rings = atoi(argv[1]);
   auto ring_size = atoi(argv[2]);

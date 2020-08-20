@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
   if (argc != 3)
     return EXIT_FAILURE;
 #ifdef CAF_BEGIN_TYPE_ID_BLOCK
-  init_global_meta_objects<matching_type_ids>();
+  init_global_meta_objects<caf::id_block::matching>();
 #endif
   impl_type impl;
   if (auto impl_opt = implproj(argv[1])) {

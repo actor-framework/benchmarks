@@ -61,7 +61,7 @@ struct tick_state {
 };
 
 struct source_state : tick_state {
-  const char* name = "source";
+  static inline const char* name = "source";
 };
 
 behavior source(stateful_actor<source_state>* self, bool print_rate) {
@@ -73,7 +73,8 @@ behavior source(stateful_actor<source_state>* self, bool print_rate) {
       self->state.tick();
     },
     [=](start_atom) {
-      return self->make_source(
+      return attach_stream_source(
+        self,
         // initialize state
         [&](unit_t&) {
           // nop
@@ -85,22 +86,20 @@ behavior source(stateful_actor<source_state>* self, bool print_rate) {
           self->state.count += num;
         },
         // check whether we reached the end
-        [=](const unit_t&) {
-          return false;
-        }
-      );
+        [=](const unit_t&) { return false; });
     },
   };
 }
 
 struct stage_state {
-  const char* name = "stage";
+  static inline const char* name = "stage";
 };
 
 behavior stage(stateful_actor<stage_state>* self) {
   return {
-    [=](const stream<string>& in) {
-      return self->make_stage(
+    [=](stream<string> in) {
+      return attach_stream_stage(
+        self,
         // input stream
         in,
         // initialize state
@@ -114,14 +113,13 @@ behavior stage(stateful_actor<stage_state>* self) {
         // cleanup
         [](unit_t&) {
           // nop
-        }
-      );
-    }
+        });
+    },
   };
 }
 
 struct sink_state : tick_state {
-  const char* name = "sink";
+  static inline const char* name = "sink";
 };
 
 behavior sink(stateful_actor<sink_state>* self, actor src) {
@@ -133,7 +131,8 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
       self->state.tick();
     },
     [=](const stream<string>& in) {
-      return self->make_sink(
+      return attach_stream_sink(
+        self,
         // input stream
         in,
         // initialize state
@@ -141,15 +140,12 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
           // nop
         },
         // processing step
-        [=](unit_t&, string) {
-          self->state.count += 1;
-        },
+        [=](unit_t&, string) { self->state.count += 1; },
         // cleanup
         [](unit_t&) {
           // nop
-        }
-      );
-    }
+        });
+    },
   };
 }
 
@@ -157,7 +153,7 @@ struct config : actor_system_config {
   config() {
 #ifdef CAF_BEGIN_TYPE_ID_BLOCK
     io::middleman::init_global_meta_objects();
-    init_global_meta_objects<simple_streaming_type_ids>();
+    init_global_meta_objects<caf::id_block::simple_streaming>();
 #else
     add_message_type<string>("string");
 #endif
@@ -187,7 +183,7 @@ void caf_main(actor_system& sys, const config& cfg) {
   } else if (cfg.mode == "sink") {
     auto s = sys.middleman().remote_actor(cfg.host, cfg.port);
     if (!s) {
-      std::cerr << "cannot connect to source: " << sys.render(s.error())
+      std::cerr << "cannot connect to source: " << to_string(s.error())
                 << std::endl;
       return;
     }

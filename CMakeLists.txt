@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10.0 FATAL_ERROR)
 
 project(benchmarks)
 
@@ -40,15 +40,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_custom_target(all_benchmarks ALL)
 
-set(CAF_COMPILED_BENCHES "")
-
-find_package(CAF COMPONENTS core io REQUIRED)
-
 include_directories(${CAF_INCLUDE_DIRS})
 
-################################################################################
-#                                   Utility                                    #
-################################################################################
+# -- store paths to tools and scripts for sub directory files ------------------
+
+set(TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+
+set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
+
+# -- utility -------------------------------------------------------------------
 
 macro(add_xxx_benchmark benchname dir name src_ending bin_ending out_path)
   set(OUT_FILE ${out_path}/${name}.${bin_ending})
@@ -77,10 +77,7 @@ macro(add_dummy_target benchname src_ending)
   add_custom_target(caf_${benchname}_dummy SOURCES ${source_files})
 endmacro()
 
-
-################################################################################
-#                                    Scala                                     #
-################################################################################
+# -- Scala ---------------------------------------------------------------------
 
 # search for Scala compiler if not disabled by the user
 if(NOT CAF_NO_SCALA_BENCHMARKS)
@@ -120,15 +117,11 @@ if(NOT CAF_NO_SCALA_BENCHMARKS)
                     SOURCES ${CAF_SCALA_SRC_FILES}
                     DEPENDS ${CAF_SCALA_OUT_FILES})
   add_dependencies(all_benchmarks scala_benchmarks)
-  set(CAF_COMPILED_BENCHES "scala ${CAF_COMPILED_BENCHES}")
 else()
   add_dummy_target(scala scala)
 endif()
 
-
-################################################################################
-#                                    SALSA                                     #
-################################################################################
+# -- SALSA ---------------------------------------------------------------------
 
 if(NOT CAF_NO_SALSA_BENCHMARKS)
   if(NOT CAF_SALSA_JAR)
@@ -251,15 +244,12 @@ if(NOT CAF_NO_SALSA_BENCHMARKS)
                             ${MAILBOX_PERFORMANCE_CLASS_FILES}
                             ${MANDELBROT_CLASS_FILES})
   add_dependencies(all_benchmarks salsa_benchmarks)
-  set(CAF_COMPILED_BENCHES "salsa ${CAF_COMPILED_BENCHES}")
 else()
   add_dummy_target(salsa salsa)
 endif()
 
 
-################################################################################
-#                                    Erlang                                    #
-################################################################################
+# -- Erlang --------------------------------------------------------------------
 
 # search for Erlang compiler if not disabled by the user
 if(NOT CAF_NO_ERLANG_BENCHMARKS)
@@ -290,15 +280,11 @@ if(NOT CAF_NO_ERLANG_BENCHMARKS)
                     SOURCES ${CAF_ERLANG_SRC_FILES}
                     DEPENDS ${CAF_ERLANG_OUT_FILES})
   add_dependencies(all_benchmarks erlang_benchmarks)
-  set(CAF_COMPILED_BENCHES "erlang ${CAF_COMPILED_BENCHES}")
 else()
   add_dummy_target(erlang erl)
 endif()
 
-
-################################################################################
-#                                    Charm++                                   #
-################################################################################
+# -- Charm++ -------------------------------------------------------------------
 
 if(NOT CAF_NO_CHARM_BENCHMARK)
   if(NOT CAF_CHARM_COMPILER)
@@ -349,76 +335,18 @@ if(NOT CAF_NO_CHARM_BENCHMARK)
                     SOURCES ${CAF_CHARM_SRC_FILES}
                     DEPENDS ${CAF_CHARM_OUT_FILES})
   add_dependencies(all_benchmarks charm_benchmarks)
-  set(CAF_COMPILED_BENCHES "charm ${CAF_COMPILED_BENCHES}")
 else()
   add_dummy_target(charm cpp ci)
 endif()
 
+# -- CAF -----------------------------------------------------------------------
 
-################################################################################
-#                                     CAF                                      #
-################################################################################
+add_subdirectory(src/caf)
 
-# add targets for CAF benchmarks
-macro(add_caf_benchmark name)
-  add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/${name}.cpp)
-  target_link_libraries(${name} ${CAF_LIBRARIES} ${LD_FLAGS})
-  add_dependencies(all_benchmarks ${name})
-endmacro()
-
-add_caf_benchmark(actor_creation)
-add_caf_benchmark(mailbox_performance)
-add_caf_benchmark(mixed_case)
-add_caf_benchmark(mandelbrot)
-#add_caf_benchmark(distributed)
-add_caf_benchmark(matrix)
-add_caf_benchmark(matching)
-add_caf_benchmark(scheduling)
-add_caf_benchmark(simple_streaming)
-set(CAF_COMPILED_BENCHES "caf ${CAF_COMPILED_BENCHES}")
-
-find_package(benchmark)
-if(benchmark_FOUND)
-  add_executable(micro ${CMAKE_CURRENT_SOURCE_DIR}/src/caf/micro.cpp)
-  target_link_libraries(micro ${CAF_LIBRARIES} ${LD_FLAGS} benchmark::benchmark_main)
-  add_dependencies(all_benchmarks micro)
-endif()
-
-################################################################################
-#                          some environment variables                          #
-################################################################################
-
-set(TOOLS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tools")
-set(SCRIPTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/scripts")
-
-
-################################################################################
-#                                    tools                                     #
-################################################################################
-
-# TODO: older versions of Boost still use auto_ptr and fail to compile with
-#       C++17
-# find_package(Boost)
-# if(Boost_FOUND)
-#   include_directories(${Boost_INCLUDE_DIRS})
-#   add_executable(to_csv "${TOOLS_DIR}/to_csv.cpp")
-#   target_link_libraries(to_csv ${CAF_LIBRARIES} ${LD_FLAGS})
-# endif()
-
-if (WIN32)
-  message(STATUS "skip caf_run_bench (not supported on Windows)")
-else()
-  add_executable(caf_run_bench "${TOOLS_DIR}/caf_run_bench.cpp")
-  target_link_libraries(caf_run_bench ${CAF_LIBRARIES} ${LD_FLAGS})
-  add_dependencies(all_benchmarks caf_run_bench)
-  add_custom_target(caf_scripts_dummy SOURCES "${SCRIPTS_DIR}/run")
-endif()
-
-################################################################################
-#                                   Scripts                                    #
-################################################################################
+# -- Scripts -------------------------------------------------------------------
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/scripts/caf_run_benchmarks.in"
                "${SCRIPTS_DIR}/caf_run_benchmarks" @ONLY)
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/scripts/run.in"
                "${SCRIPTS_DIR}/run" @ONLY)

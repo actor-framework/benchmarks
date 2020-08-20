@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
   if (argc != 2)
     usage();
 #ifdef CAF_BEGIN_TYPE_ID_BLOCK
-  init_global_meta_objects<actor_creation_type_ids>();
+  init_global_meta_objects<caf::id_block::actor_creation>();
 #endif
   s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   actor_system_config cfg;

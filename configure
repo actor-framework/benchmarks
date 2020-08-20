@@ -187,6 +187,7 @@ while [ $# -ne 0 ]; do
             append_cache_entry CAF_SALSA_JAR FILEPATH "$optarg"
             ;;
         --with-caf=*)
+            append_cache_entry CAF_ROOT     FILEPATH "$optarg"
             append_cache_entry CAF_ROOT_DIR FILEPATH "$optarg"
             ;;
         *)

@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
   if (argc != 3)
     return usage();
 #ifdef CAF_BEGIN_TYPE_ID_BLOCK
-  init_global_meta_objects<mailbox_performance_type_ids>();
+  init_global_meta_objects<caf::id_block::mailbox_performance>();
 #endif
   run(argc, argv, static_cast<uint64_t>(std::stoll(argv[1])),
       static_cast<uint64_t>(std::stoll(argv[2])));

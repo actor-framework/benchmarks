@@ -176,7 +176,7 @@ void init_fstream(const string& fname, std::fstream& fs) {
 
 int caf_main(actor_system& system, const my_config& cfg) {
 #ifdef CAF_BEGIN_TYPE_ID_BLOCK
-  init_global_meta_objects<run_bench_type_ids>();
+  init_global_meta_objects<caf::id_block::run_bench>();
 #endif
   std::fstream runtime_out;
   std::fstream mem_out;
