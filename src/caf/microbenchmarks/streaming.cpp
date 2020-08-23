@@ -179,7 +179,17 @@ behavior sink(stateful_actor<sink_state>* self, actor done_listener) {
 
 // -- fixture for single-system streaming --------------------------------------
 
-struct SingleSystem : benchmark::Fixture {
+struct FixtureBase : benchmark::Fixture {
+  FixtureBase() {
+#if CAF_VERSION >= 1800
+    caf::init_global_meta_objects<caf::id_block::streaming>();
+    caf::io::middleman::init_global_meta_objects();
+    caf::core::init_global_meta_objects();
+#endif
+  }
+};
+
+struct SingleSystem : FixtureBase {
   actor_system_config cfg;
   actor_system sys{cfg};
 };
@@ -250,13 +260,11 @@ BENCHMARK_REGISTER_F(SingleSystem, MessagePipeline)
 // -- fixture for multi-system streaming ---------------------------------------
 
 template <size_t NumStages>
-struct ManySystems : benchmark::Fixture {
+struct ManySystems : FixtureBase {
   struct config : actor_system_config {
     config() {
       load<io::middleman>();
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
-      init_global_meta_objects<caf::id_block::streaming>();
-#else
+#ifndef CAF_BEGIN_TYPE_ID_BLOCK
       add_message_type_impl<stream<uint64_t>>("stream<uint64_t>");
       add_message_type_impl<vector<uint64_t>>("vector<uint64_t>");
 #endif
