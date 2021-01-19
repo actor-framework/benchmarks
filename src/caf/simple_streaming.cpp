@@ -25,7 +25,13 @@
 #include "caf/all.hpp"
 #include "caf/io/all.hpp"
 
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION < 1800
+
+using start_atom = caf::atom_constant<caf::atom("start")>;
+
+static constexpr start_atom start_atom_v = start_atom::value;
+
+#else
 
 CAF_BEGIN_TYPE_ID_BLOCK(simple_streaming, first_custom_type_id)
 
@@ -35,12 +41,6 @@ CAF_BEGIN_TYPE_ID_BLOCK(simple_streaming, first_custom_type_id)
   CAF_ADD_ATOM(simple_streaming, start_atom);
 
 CAF_END_TYPE_ID_BLOCK(simple_streaming)
-
-#else
-
-using start_atom = caf::atom_constant<caf::atom("start")>;
-
-static constexpr start_atom start_atom_v = start_atom::value;
 
 #endif
 
@@ -151,11 +151,11 @@ behavior sink(stateful_actor<sink_state>* self, actor src) {
 
 struct config : actor_system_config {
   config() {
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION < 1800
+    add_message_type<string>("string");
+#else
     io::middleman::init_global_meta_objects();
     init_global_meta_objects<caf::id_block::simple_streaming>();
-#else
-    add_message_type<string>("string");
 #endif
     opt_group{custom_options_, "global"}
     .add(mode, "mode,m", "one of 'sink', 'source', or 'both'")

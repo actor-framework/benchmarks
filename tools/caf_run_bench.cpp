@@ -19,7 +19,14 @@
 # include <mach/kern_return.h>
 #endif
 
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION < 1800
+
+using go_atom = caf::atom_constant<caf::atom("go")>;
+using poll_atom = caf::atom_constant<caf::atom("poll")>;
+constexpr go_atom go_atom_v = go_atom::value;
+constexpr poll_atom poll_atom_v = poll_atom::value;
+
+#else
 
 CAF_BEGIN_TYPE_ID_BLOCK(run_bench, first_custom_type_id)
 
@@ -28,15 +35,11 @@ CAF_BEGIN_TYPE_ID_BLOCK(run_bench, first_custom_type_id)
 
 CAF_END_TYPE_ID_BLOCK(run_bench)
 
-#else
+#endif
 
-using go_atom = caf::atom_constant<caf::atom("go")>;
-using poll_atom = caf::atom_constant<caf::atom("poll")>;
+#if CAF_VERSION < 1700
 using timeout_atom = caf::atom_constant<caf::atom("timeout")>;
-constexpr go_atom go_atom_v = go_atom::value;
-constexpr poll_atom poll_atom_v = poll_atom::value;
 constexpr timeout_atom timeout_atom_v = timeout_atom::value;
-
 #endif
 
 using namespace caf;
@@ -175,8 +178,9 @@ void init_fstream(const string& fname, std::fstream& fs) {
 }
 
 int caf_main(actor_system& system, const my_config& cfg) {
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::run_bench>();
+  core::init_global_meta_objects();
 #endif
   std::fstream runtime_out;
   std::fstream mem_out;

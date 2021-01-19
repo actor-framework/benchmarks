@@ -24,8 +24,13 @@
 
 #include "caf/all.hpp"
 
-// TODO: use proper version check once 0.18 has an official release
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION < 1800
+
+using msg_atom = caf::atom_constant<caf::atom("msg")>;
+
+static constexpr msg_atom msg_atom_v = msg_atom::value;
+
+#else
 
 CAF_BEGIN_TYPE_ID_BLOCK(mailbox_performance, first_custom_type_id)
 
@@ -33,13 +38,7 @@ CAF_BEGIN_TYPE_ID_BLOCK(mailbox_performance, first_custom_type_id)
 
 CAF_END_TYPE_ID_BLOCK(mailbox_performance)
 
-#else // CAF_BEGIN_TYPE_ID_BLOCK
-
-using msg_atom = caf::atom_constant<caf::atom("msg")>;
-
-static constexpr msg_atom msg_atom_v = msg_atom::value;
-
-#endif // CAF_BEGIN_TYPE_ID_BLOCK
+#endif
 
 using namespace caf;
 
@@ -83,7 +82,6 @@ int usage() {
 void run(int argc, char** argv, uint64_t num_sender, uint64_t num_msgs) {
   auto total = num_sender * num_msgs;
   actor_system_config cfg;
-  cfg.parse(argc, argv, "caf-application.ini");
   actor_system system{cfg};
   auto testee = system.spawn<receiver>(total);
   for (uint64_t i = 0; i < num_sender; ++i)
@@ -95,8 +93,9 @@ void run(int argc, char** argv, uint64_t num_sender, uint64_t num_msgs) {
 int main(int argc, char** argv) {
   if (argc != 3)
     return usage();
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::mailbox_performance>();
+  core::init_global_meta_objects();
 #endif
   run(argc, argv, static_cast<uint64_t>(std::stoll(argv[1])),
       static_cast<uint64_t>(std::stoll(argv[2])));

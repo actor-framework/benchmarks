@@ -27,22 +27,7 @@
 
 #include "caf/all.hpp"
 
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
-
-CAF_BEGIN_TYPE_ID_BLOCK(matching, first_custom_type_id)
-
-  CAF_ADD_TYPE_ID(matching, (std::list<int32_t>) );
-
-  CAF_ADD_ATOM(matching, msg1_atom);
-  CAF_ADD_ATOM(matching, msg2_atom);
-  CAF_ADD_ATOM(matching, msg3_atom);
-  CAF_ADD_ATOM(matching, msg4_atom);
-  CAF_ADD_ATOM(matching, msg5_atom);
-  CAF_ADD_ATOM(matching, msg6_atom);
-
-CAF_END_TYPE_ID_BLOCK(matching)
-
-#else
+#if CAF_VERSION < 1800
 
 using msg1_atom = caf::atom_constant<caf::atom("msg1")>;
 using msg2_atom = caf::atom_constant<caf::atom("msg2")>;
@@ -56,6 +41,21 @@ static constexpr msg3_atom msg3_atom_v = msg3_atom::value;
 static constexpr msg4_atom msg4_atom_v = msg4_atom::value;
 static constexpr msg5_atom msg5_atom_v = msg5_atom::value;
 static constexpr msg6_atom msg6_atom_v = msg6_atom::value;
+
+#else
+
+CAF_BEGIN_TYPE_ID_BLOCK(matching, first_custom_type_id)
+
+  CAF_ADD_TYPE_ID(matching, (std::list<int32_t>) );
+
+  CAF_ADD_ATOM(matching, msg1_atom);
+  CAF_ADD_ATOM(matching, msg2_atom);
+  CAF_ADD_ATOM(matching, msg3_atom);
+  CAF_ADD_ATOM(matching, msg4_atom);
+  CAF_ADD_ATOM(matching, msg5_atom);
+  CAF_ADD_ATOM(matching, msg6_atom);
+
+CAF_END_TYPE_ID_BLOCK(matching)
 
 #endif
 
@@ -85,7 +85,7 @@ optional<impl_type> implproj(const string& str) {
 int main(int argc, char** argv) {
   if (argc != 3)
     return EXIT_FAILURE;
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::matching>();
 #endif
   impl_type impl;

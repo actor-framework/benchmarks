@@ -22,24 +22,29 @@
 
 #include "caf/all.hpp"
 
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
-
-CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
-
-  CAF_ADD_TYPE_ID(mixed_case, (std::chrono::high_resolution_clock::time_point))
-
-  CAF_ADD_ATOM(mixed_case, task_atom)
-  CAF_ADD_ATOM(mixed_case, result_atom)
-
-CAF_END_TYPE_ID_BLOCK(mixed_case)
-
-#else
+#if CAF_VERSION < 1800
 
 using task_atom = caf::atom_constant<caf::atom("task")>;
 using result_atom = caf::atom_constant<caf::atom("result")>;
 constexpr task_atom task_atom_v = task_atom::value;
 constexpr result_atom result_atom_v = result_atom::value;
 
+#else
+
+CAF_BEGIN_TYPE_ID_BLOCK(scheduling, first_custom_type_id)
+
+  CAF_ADD_TYPE_ID(scheduling, (std::chrono::high_resolution_clock::time_point))
+
+  CAF_ADD_ATOM(scheduling, task_atom)
+  CAF_ADD_ATOM(scheduling, result_atom)
+
+CAF_END_TYPE_ID_BLOCK(scheduling)
+
+#endif
+
+#if CAF_VERSION < 1700
+using settings = caf::dictionary<caf::config_value::dictionary>;
+constexpr caf::tick_atom tick_atom_v = caf::tick_atom::value;
 #endif
 
 using namespace caf;
@@ -250,6 +255,10 @@ void impl6(actor_system& system) {
 }
 
 int main(int argc, char** argv) {
+#if CAF_VERSION >= 1800
+  caf::init_global_meta_objects<caf::id_block::scheduling>();
+  caf::core::init_global_meta_objects();
+#endif
   int workload = 0;
   actor_system_config cfg;
   std::string labels_output_file;

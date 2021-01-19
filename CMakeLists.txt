@@ -1,6 +1,13 @@
-cmake_minimum_required(VERSION 3.10.0 FATAL_ERROR)
-
+cmake_minimum_required(VERSION 3.10...3.13.5 FATAL_ERROR)
 project(benchmarks)
+
+set(CMAKE_CXX_STANDARD 17)
+
+set(CAF_TAG "master" CACHE STRING "CAF tag or branch name for bundled builds")
+
+# -- includes ------------------------------------------------------------------
+
+include(FetchContent)              # For bundling CAF with the incubator
 
 if(NOT CMAKE_CROSSCOMPILING)
   # Check whether the user already provided flags that enable C++ >= 17.

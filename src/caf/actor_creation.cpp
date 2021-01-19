@@ -24,8 +24,14 @@
 
 #include "caf/all.hpp"
 
-// TODO: use proper version check once 0.18 has an official release
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION < 1800
+
+using spread_atom = caf::atom_constant<caf::atom("spread")>;
+using result_atom = caf::atom_constant<caf::atom("result")>;
+static constexpr spread_atom spread_atom_v = spread_atom::value;
+static constexpr result_atom result_atom_v = result_atom::value;
+
+#else
 
 CAF_BEGIN_TYPE_ID_BLOCK(actor_creation, first_custom_type_id)
 
@@ -34,14 +40,7 @@ CAF_BEGIN_TYPE_ID_BLOCK(actor_creation, first_custom_type_id)
 
 CAF_END_TYPE_ID_BLOCK(actor_creation)
 
-#else // CAF_BEGIN_TYPE_ID_BLOCK
-
-using spread_atom = caf::atom_constant<caf::atom("spread")>;
-using result_atom = caf::atom_constant<caf::atom("result")>;
-static constexpr spread_atom spread_atom_v = spread_atom::value;
-static constexpr result_atom result_atom_v = result_atom::value;
-
-#endif // CAF_BEGIN_TYPE_ID_BLOCK
+#endif
 
 using namespace caf;
 
@@ -98,12 +97,12 @@ void usage() {
 int main(int argc, char** argv) {
   if (argc != 2)
     usage();
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::actor_creation>();
+  core::init_global_meta_objects();
 #endif
   s_num = static_cast<uint32_t>(std::stoi(argv[1]));
   actor_system_config cfg;
-  cfg.parse(argc, argv, "caf-application.ini");
   actor_system system{cfg};
   scoped_actor self{system};
   anon_send(system.spawn<lazy_init>(testee, self), spread_atom_v, s_num);

@@ -25,7 +25,16 @@
 
 #include "caf/all.hpp"
 
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION < 1800
+
+using calc_atom = caf::atom_constant<caf::atom("calc")>;
+using token_atom = caf::atom_constant<caf::atom("token")>;
+using done_atom = caf::atom_constant<caf::atom("done")>;
+static constexpr calc_atom calc_atom_v = calc_atom::value;
+static constexpr token_atom token_atom_v = token_atom::value;
+static constexpr done_atom done_atom_v = done_atom::value;
+
+#else
 
 CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
 
@@ -36,15 +45,6 @@ CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
   CAF_ADD_ATOM(mixed_case, token_atom);
 
 CAF_END_TYPE_ID_BLOCK(mixed_case)
-
-#else
-
-using calc_atom = caf::atom_constant<caf::atom("calc")>;
-using token_atom = caf::atom_constant<caf::atom("token")>;
-using done_atom = caf::atom_constant<caf::atom("done")>;
-static constexpr calc_atom calc_atom_v = calc_atom::value;
-static constexpr token_atom token_atom_v = token_atom::value;
-static constexpr done_atom done_atom_v = done_atom::value;
 
 #endif
 
@@ -190,15 +190,15 @@ int main(int argc, char** argv) {
             "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS\n\n";
     return 1;
   }
-#ifdef CAF_BEGIN_TYPE_ID_BLOCK
+#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::mixed_case>();
+  core::init_global_meta_objects();
 #endif
   auto num_rings = atoi(argv[1]);
   auto ring_size = atoi(argv[2]);
   auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
   auto repetitions = atoi(argv[4]);
   actor_system_config cfg;
-  cfg.parse(argc, argv, "caf-application.ini");
   actor_system system{cfg};
   auto sv = system.spawn<supervisor, lazy_init>(num_rings
                                                 + (num_rings * repetitions));
