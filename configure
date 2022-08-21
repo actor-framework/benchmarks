@@ -188,7 +188,6 @@ while [ $# -ne 0 ]; do
             ;;
         --with-caf=*)
             append_cache_entry CAF_ROOT     FILEPATH "$optarg"
-            append_cache_entry CAF_ROOT_DIR FILEPATH "$optarg"
             ;;
         --caf-tag=*)
           tag="$optarg"

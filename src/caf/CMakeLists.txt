@@ -4,9 +4,6 @@ set(DISABLE_STREAMING_BENCH OFF)
 
 if (CAF_ROOT)
   find_package(CAF COMPONENTS core io REQUIRED)
-  if(CAF_VERSION VERSION_LESS 1.17)
-    set(DISABLE_STREAMING_BENCH ON)
-  endif()
 else()
   message(STATUS "Fetch CAF ${CAF_TAG}")
   FetchContent_Declare(
@@ -71,10 +68,6 @@ foreach(name
           "matching" "scheduling")
   add_caf_benchmark("${name}")
 endforeach()
-
-if(NOT DISABLE_STREAMING_BENCH)
-  add_caf_benchmark("simple_streaming")
-endif()
 
 #add_caf_benchmark(distributed)
 
