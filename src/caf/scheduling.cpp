@@ -17,19 +17,11 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
-#include <vector>
-#include <chrono>
-
 #include "caf/all.hpp"
 
-#if CAF_VERSION < 1800
-
-using task_atom = caf::atom_constant<caf::atom("task")>;
-using result_atom = caf::atom_constant<caf::atom("result")>;
-constexpr task_atom task_atom_v = task_atom::value;
-constexpr result_atom result_atom_v = result_atom::value;
-
-#else
+#include <chrono>
+#include <iostream>
+#include <vector>
 
 CAF_BEGIN_TYPE_ID_BLOCK(scheduling, first_custom_type_id)
 
@@ -39,13 +31,6 @@ CAF_BEGIN_TYPE_ID_BLOCK(scheduling, first_custom_type_id)
   CAF_ADD_ATOM(scheduling, result_atom)
 
 CAF_END_TYPE_ID_BLOCK(scheduling)
-
-#endif
-
-#if CAF_VERSION < 1700
-using settings = caf::dictionary<caf::config_value::dictionary>;
-constexpr caf::tick_atom tick_atom_v = caf::tick_atom::value;
-#endif
 
 using namespace caf;
 using namespace std::chrono;
@@ -58,45 +43,36 @@ auto ms(T x, T y) -> decltype(duration_cast<milliseconds>(y - x).count()) {
 using hrc = high_resolution_clock;
 
 behavior task_worker(event_based_actor* self) {
-  aout(self) << self->id() << " task_worker_" << self->id() << std::endl;
-  return {
-    [=](task_atom, int complexity, hrc::time_point) -> int {
-      //aout(self) << "delay until received: " << ms(ts, hrc::now()) << endl;
-      int result = 0;
-      auto x = uint64_t{1} << complexity;
-      for (uint64_t j = 0; j < x; ++j) {
-        for (int i = 0; i < 5000000; ++i) {
-          ++result;
-        }
+  return {[=](task_atom, int complexity, hrc::time_point) -> int {
+    // aout(self) << "delay until received: " << ms(ts, hrc::now()) << endl;
+    int result = 0;
+    auto x = uint64_t{1} << complexity;
+    for (uint64_t j = 0; j < x; ++j) {
+      for (int i = 0; i < 5000000; ++i) {
+        ++result;
       }
-      return result;
     }
-  };
+    return result;
+  }};
 }
 
 behavior recursive_worker(event_based_actor* self, actor parent) {
-  return {
-    [=](task_atom, uint32_t x) {
-      if (x == 1) {
-        self->send(parent, result_atom_v, uint32_t{1});
-        self->quit();
-        return;
-      }
-      auto msg = make_message(task_atom_v, x - 1);
-      self->send(self->spawn<lazy_init>(recursive_worker, self), msg);
-      self->send(self->spawn<lazy_init>(recursive_worker, self), msg);
-      self->become (
-        [=](result_atom, uint32_t r1) {
-          self->become (
-            [=](result_atom, uint32_t r2) {
-              self->send(parent, result_atom_v, 1 + r1 + r2);
-              self->quit();
-            }
-          );
-        }
-      );
+  return {[=](task_atom, uint32_t x) {
+    if (x == 1) {
+      self->mail(result_atom_v, uint32_t{1}).send(parent);
+      self->quit();
+      return;
     }
-  };
+    auto msg = make_message(task_atom_v, x - 1);
+    self->mail(msg).send(self->spawn<lazy_init>(recursive_worker, self));
+    self->mail(msg).send(self->spawn<lazy_init>(recursive_worker, self));
+    self->become([=](result_atom, uint32_t r1) {
+      self->become([=](result_atom, uint32_t r2) {
+        self->mail(result_atom_v, 1 + r1 + r2).send(parent);
+        self->quit();
+      });
+    });
+  }};
 }
 
 bool mandatory_missing(const settings& conf,
@@ -135,8 +111,8 @@ bool setup(int argc, char** argv, std::string& labels_output_file,
     std::cerr << options.help_text() << std::endl;
     return EXIT_FAILURE;
   }
-  if (get_or(conf, "help", false) ||
-      mandatory_missing(conf, {"output", "labels", "workload"})) {
+  if (get_or(conf, "help", false)
+      || mandatory_missing(conf, {"output", "labels", "workload"})) {
     std::cout << options.help_text() << '\n';
     return false;
   }
@@ -161,7 +137,7 @@ void impl1(actor_system& system) {
   for (int j = 0; j < 10; ++j)
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
-        anon_send(w, task_atom_v, i, hrc::now());
+        anon_mail(task_atom_v, i, hrc::now()).send(w);
   for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
 }
@@ -170,7 +146,7 @@ void impl1(actor_system& system) {
 void impl2(actor_system& system) {
   scoped_actor self{system};
   auto root = system.spawn(recursive_worker, self);
-  anon_send(root, task_atom_v, uint32_t{15});
+  anon_mail(task_atom_v, uint32_t{15}).send(root);
 }
 
 /// Spawn 20 `task_worker`and give them work,
@@ -184,9 +160,9 @@ void impl3(actor_system& system) {
   for (int j = 0; j < 10; ++j)
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
-        anon_send(w, task_atom_v, i, hrc::now());
+        anon_mail(task_atom_v, i, hrc::now()).send(w);
   auto root = system.spawn(recursive_worker, self);
-  anon_send(root, task_atom_v, uint32_t{15});
+  anon_mail(task_atom_v, uint32_t{15}).send(root);
   for (auto& w : workers)
     anon_send_exit(w, exit_reason::user_shutdown);
   anon_send_exit(root, exit_reason::user_shutdown);
@@ -201,9 +177,9 @@ void impl4(actor_system& system) {
   for (int j = 0; j < 10; ++j) {
     for (int i = 0; i < 5; ++i)
       for (auto& w : workers)
-        anon_send(w, task_atom_v, i, hrc::now());
+        anon_mail(task_atom_v, i, hrc::now()).send(w);
     auto root = system.spawn(recursive_worker, self);
-    anon_send(root, task_atom_v, uint32_t{15});
+    anon_mail(task_atom_v, uint32_t{15}).send(root);
     for (int i = 0; i < 5; ++i)
       workers.push_back(system.spawn<lazy_init>(task_worker));
     anon_send_exit(root, exit_reason::user_shutdown);
@@ -216,20 +192,15 @@ void impl4(actor_system& system) {
 /// after that, 5 `task_worker` are spawnend in an actor pool
 void impl5(actor_system& system) {
   scoped_actor self{system};
-  auto factory = [&] {
-    return system.spawn(recursive_worker, self);
-  };
-  auto pool = actor_pool::make(system.dummy_execution_unit(),
-                               5, factory, actor_pool::broadcast());
-  anon_send(pool, task_atom_v, uint32_t{15});
-  auto factory_task = [&] {
-    return system.spawn(task_worker);
-  };
-  auto pool2 = actor_pool::make(system.dummy_execution_unit(),
-                                5, factory_task, actor_pool::broadcast());
+  auto factory = [&] { return system.spawn(recursive_worker, self); };
+  auto pool = actor_pool::make(system, 5, factory, actor_pool::broadcast());
+  anon_mail(task_atom_v, uint32_t{15}).send(pool);
+  auto factory_task = [&] { return system.spawn(task_worker); };
+  auto pool2 = actor_pool::make(system, 5, factory_task,
+                                actor_pool::broadcast());
   for (int j = 0; j < 10; ++j) {
     for (int i = 0; i < 9; ++i) {
-      anon_send(pool2, task_atom_v, i, hrc::now());
+      anon_mail(task_atom_v, i, hrc::now()).send(pool2);
     }
   }
   anon_send_exit(pool2, exit_reason::user_shutdown);
@@ -242,30 +213,28 @@ void impl6(actor_system& system) {
   scoped_actor self{system};
   for (int i = 0; i < 20; ++i) {
     if (i % 2) {
-      anon_send(system.spawn(recursive_worker, self),
-                task_atom_v, uint32_t{15});
+      anon_mail(task_atom_v, uint32_t{15})
+        .send(system.spawn(recursive_worker, self));
     } else {
-      auto pool = actor_pool::make(system.dummy_execution_unit(), 10,
-                                   [&]{ return system.spawn(task_worker); },
-                                   actor_pool::broadcast());
-      anon_send(pool, task_atom_v, i, hrc::now());
+      auto pool = actor_pool::make(
+        system, 10, [&] { return system.spawn(task_worker); },
+        actor_pool::broadcast());
+      anon_mail(task_atom_v, i, hrc::now()).send(pool);
       anon_send_exit(pool, exit_reason::user_shutdown);
     }
   }
 }
 
 int main(int argc, char** argv) {
-#if CAF_VERSION >= 1800
   caf::init_global_meta_objects<caf::id_block::scheduling>();
   caf::core::init_global_meta_objects();
-#endif
   int workload = 0;
   actor_system_config cfg;
   std::string labels_output_file;
   if (!setup(argc, argv, labels_output_file, workload, cfg))
     return 1;
   actor_system system(cfg);
-  actor_ostream::redirect_all(system, labels_output_file);
+  // actor_ostream::redirect_all removed in new CAF API
   using implfun = void (*)(actor_system&);
   implfun funs[] = {impl1, impl2, impl3, impl4, impl5, impl6};
   funs[workload](system);

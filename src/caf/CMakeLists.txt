@@ -10,6 +10,7 @@ else()
     actor_framework
     GIT_REPOSITORY https://github.com/actor-framework/actor-framework.git
     GIT_TAG        ${CAF_TAG}
+    GIT_SHALLOW    ON
   )
   FetchContent_Populate(actor_framework)
   string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+$" TAG_IS_VERSION "${CAF_TAG}")

@@ -25,17 +25,6 @@
 
 #include "caf/all.hpp"
 
-#if CAF_VERSION < 1800
-
-using calc_atom = caf::atom_constant<caf::atom("calc")>;
-using token_atom = caf::atom_constant<caf::atom("token")>;
-using done_atom = caf::atom_constant<caf::atom("done")>;
-static constexpr calc_atom calc_atom_v = calc_atom::value;
-static constexpr token_atom token_atom_v = token_atom::value;
-static constexpr done_atom done_atom_v = done_atom::value;
-
-#else
-
 CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
 
   CAF_ADD_TYPE_ID(mixed_case, (std::vector<uint64_t>) );
@@ -45,8 +34,6 @@ CAF_BEGIN_TYPE_ID_BLOCK(mixed_case, first_custom_type_id)
   CAF_ADD_ATOM(mixed_case, token_atom);
 
 CAF_END_TYPE_ID_BLOCK(mixed_case)
-
-#endif
 
 using std::cout;
 using std::endl;
@@ -91,8 +78,10 @@ inline void check_factors(const factors& vec) {
 
 behavior worker(event_based_actor* self) {
   return {
-    [](calc_atom, uint64_t what) { return factorize(what); },
-    [=](done_atom) { self->quit(); },
+    [self](calc_atom, uint64_t what, const actor& collector) {
+      self->mail(factorize(what)).send(collector);
+    },
+    [self](done_atom) { self->quit(); },
   };
 }
 
@@ -101,7 +90,7 @@ behavior chain_link(event_based_actor* self, const actor& next) {
     [=](token_atom tk, uint64_t value) {
       if (value == 0)
         self->quit();
-      self->delegate(next, tk, value);
+      self->mail(tk, value).delegate(next);
     },
   };
 }
@@ -128,13 +117,13 @@ public:
           if (++iteration_ < num_iterations_) {
             new_ring();
           } else {
-            send(factorizer_, done_atom_v);
-            send(mc_, done_atom_v);
+            this->mail(done_atom_v).send(factorizer_);
+            this->mail(done_atom_v).send(mc_);
             quit();
           }
         } else {
           value -= 1;
-          delegate(next_, tk, value);
+          this->mail(tk, value).delegate(next_);
         }
       },
     };
@@ -142,11 +131,11 @@ public:
 
 private:
   void new_ring() {
-    send_as(mc_, factorizer_, calc_atom_v, s_task_n);
+    mail(calc_atom_v, s_task_n, mc_).send(factorizer_);
     next_ = this;
     for (int i = 1; i < ring_size_; ++i)
       next_ = spawn<lazy_init>(chain_link, next_);
-    send(next_, token_atom_v, m_initial_token_value);
+    mail(token_atom_v, m_initial_token_value).send(next_);
   }
   int iteration_;
   int ring_size_;
@@ -162,6 +151,10 @@ public:
   supervisor(actor_config& cfg, int num_msgs)
     : event_based_actor(cfg), left_(num_msgs) {
     // nop
+  }
+
+  const char* name() const override {
+    return "supervisor";
   }
 
   behavior make_behavior() override {
@@ -190,10 +183,8 @@ int main(int argc, char** argv) {
             "NUM_RINGS RING_SIZE INITIAL_TOKEN_VALUE REPETITIONS\n\n";
     return 1;
   }
-#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::mixed_case>();
   core::init_global_meta_objects();
-#endif
   auto num_rings = atoi(argv[1]);
   auto ring_size = atoi(argv[2]);
   auto initial_token_value = static_cast<uint64_t>(atoi(argv[3]));
@@ -205,4 +196,3 @@ int main(int argc, char** argv) {
   for (int i = 0; i < num_rings; ++i)
     system.spawn<chain_master>(sv, ring_size, initial_token_value, repetitions);
 }
-

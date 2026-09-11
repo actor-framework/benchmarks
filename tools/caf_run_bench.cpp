@@ -19,28 +19,12 @@
 # include <mach/kern_return.h>
 #endif
 
-#if CAF_VERSION < 1800
-
-using go_atom = caf::atom_constant<caf::atom("go")>;
-using poll_atom = caf::atom_constant<caf::atom("poll")>;
-constexpr go_atom go_atom_v = go_atom::value;
-constexpr poll_atom poll_atom_v = poll_atom::value;
-
-#else
-
 CAF_BEGIN_TYPE_ID_BLOCK(run_bench, first_custom_type_id)
 
   CAF_ADD_ATOM(run_bench, go_atom);
   CAF_ADD_ATOM(run_bench, poll_atom);
 
 CAF_END_TYPE_ID_BLOCK(run_bench)
-
-#endif
-
-#if CAF_VERSION < 1700
-using timeout_atom = caf::atom_constant<caf::atom("timeout")>;
-constexpr timeout_atom timeout_atom_v = timeout_atom::value;
-#endif
 
 using namespace caf;
 
@@ -102,9 +86,9 @@ void watchdog(blocking_actor* self, int max_runtime) {
       child = child_pid;
     }
   );
-  self->delayed_send(self, std::chrono::seconds(max_runtime), timeout_atom_v);
+  self->mail(caf::timeout_atom_v).delay(std::chrono::seconds(max_runtime)).send(self);
   self->receive(
-    [=](timeout_atom) {
+    [=](caf::timeout_atom) {
       kill(child, 9);
     },
     [&](const exit_msg& msg) {
@@ -127,12 +111,11 @@ void memrecord(blocking_actor* self, int poll_interval, std::ostream* out_ptr) {
   );
   fname += std::to_string(child);
   fname += "/status";
-  self->send(self, poll_atom_v);
+  self->mail(poll_atom_v).send(self);
   bool running = true;
   self->receive_while(running)(
     [&](poll_atom) {
-      self->delayed_send(self, std::chrono::milliseconds(poll_interval),
-                         poll_atom_v);
+      self->mail(poll_atom_v).delay(std::chrono::milliseconds(poll_interval)).send(self);
       print_rss(out , line_buf, fname, child);
     },
     [&](const exit_msg& msg) {
@@ -178,10 +161,8 @@ void init_fstream(const string& fname, std::fstream& fs) {
 }
 
 int caf_main(actor_system& system, const my_config& cfg) {
-#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::run_bench>();
   core::init_global_meta_objects();
-#endif
   std::fstream runtime_out;
   std::fstream mem_out;
   init_fstream(cfg.runtime_out_fname, runtime_out);
@@ -214,8 +195,8 @@ int caf_main(actor_system& system, const my_config& cfg) {
     }
     std::vector<char*> arr;
     arr.emplace_back(const_cast<char*>(cfg.bench.c_str()));
-    for (size_t i = 0; i < cfg.remainder.size(); ++i) {
-      arr.emplace_back(const_cast<char *>(cfg.remainder[i].c_str()));
+    for (size_t i = 0; i < cfg.remainder().size(); ++i) {
+      arr.emplace_back(const_cast<char *>(cfg.remainder()[i].c_str()));
     }
     arr.emplace_back(nullptr);
     execv(cfg.bench.c_str(), arr.data());
@@ -224,9 +205,9 @@ int caf_main(actor_system& system, const my_config& cfg) {
     abort();
   }
   auto msg = make_message(go_atom_v, child_pid);
-  anon_send(dog, msg);
+  anon_mail(msg).send(dog);
   if (mem_out)
-    anon_send(mem_rec, msg);
+    anon_mail(msg).send(mem_rec);
   int child_exit_status = 0;
   wait(&child_exit_status);
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - s_start);

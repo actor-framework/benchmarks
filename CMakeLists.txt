@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.10...3.13.5 FATAL_ERROR)
 project(benchmarks)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
-set(CAF_TAG "master" CACHE STRING "CAF tag or branch name for bundled builds")
+set(CAF_TAG "main" CACHE STRING "CAF tag or branch name for bundled builds")
 
 # -- includes ------------------------------------------------------------------
 

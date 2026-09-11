@@ -17,21 +17,20 @@
  * http://www.boost.org/LICENSE_1_0.txt.                                      *
  ******************************************************************************/
 
+#include <caf/actor_system.hpp>
+#include <caf/actor_system_config.hpp>
+#include <caf/anon_mail.hpp>
+#include <caf/behavior.hpp>
+#include <caf/event_based_actor.hpp>
+#include <caf/init_global_meta_objects.hpp>
+#include <caf/message.hpp>
+#include <caf/scoped_actor.hpp>
+#include <caf/type_id.hpp>
+
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-
-#include "caf/all.hpp"
-
-#if CAF_VERSION < 1800
-
-using spread_atom = caf::atom_constant<caf::atom("spread")>;
-using result_atom = caf::atom_constant<caf::atom("result")>;
-static constexpr spread_atom spread_atom_v = spread_atom::value;
-static constexpr result_atom result_atom_v = result_atom::value;
-
-#else
 
 CAF_BEGIN_TYPE_ID_BLOCK(actor_creation, first_custom_type_id)
 
@@ -40,50 +39,42 @@ CAF_BEGIN_TYPE_ID_BLOCK(actor_creation, first_custom_type_id)
 
 CAF_END_TYPE_ID_BLOCK(actor_creation)
 
-#endif
-
-using namespace caf;
-
 namespace {
 
 uint32_t s_num;
 
-} // namespace <anonymous>
+} // namespace
 
-behavior testee(event_based_actor* self, actor parent) {
+caf::behavior testee(caf::event_based_actor* self, caf::actor parent) {
   return {
     [=](spread_atom, uint32_t x) {
       if (x == 1) {
-        self->send(parent, result_atom_v, uint32_t{1});
+        self->mail(result_atom_v, uint32_t{1}).send(parent);
         self->quit();
         return;
       }
-      auto msg = make_message(spread_atom_v, x - 1);
-      self->send(self->spawn<lazy_init>(testee, self), msg);
-      self->send(self->spawn<lazy_init>(testee, self), msg);
-      self->become (
-        [=](result_atom, uint32_t r1) {
-          self->become (
-            [=](result_atom, uint32_t r2) {
-              /*if (parent == invalid_actor) {
-                uint32_t res = 2 + r1 + r2;
-                uint32_t expected = (1 << s_num);
-                if (res != expected) {
-                  cerr << "expected: " << expected
-                       << ", found: " << res
-                       << endl;
-                  exit(42);
-                }
-              } else {
-                self->send(parent, result_atom_v, 1 + r1 + r2);
-              }
-              */
-              self->send(parent, result_atom_v, 1 + r1 + r2);
-              self->quit();
+      auto msg = caf::make_message(spread_atom_v, x - 1);
+      self->mail(msg).send(self->spawn<caf::lazy_init>(testee, self));
+      self->mail(msg).send(self->spawn<caf::lazy_init>(testee, self));
+      self->become([=](result_atom, uint32_t r1) {
+        self->become([=](result_atom, uint32_t r2) {
+          /*if (parent == invalid_actor) {
+            uint32_t res = 2 + r1 + r2;
+            uint32_t expected = (1 << s_num);
+            if (res != expected) {
+              cerr << "expected: " << expected
+                   << ", found: " << res
+                   << endl;
+              exit(42);
             }
-          );
-        }
-      );
+          } else {
+            self->mail(result_atom_v, 1 + r1 + r2).send(parent);
+          }
+          */
+          self->mail(result_atom_v, 1 + r1 + r2).send(parent);
+          self->quit();
+        });
+      });
     },
   };
 }
@@ -97,13 +88,12 @@ void usage() {
 int main(int argc, char** argv) {
   if (argc != 2)
     usage();
-#if CAF_VERSION >= 1800
-  init_global_meta_objects<caf::id_block::actor_creation>();
-  core::init_global_meta_objects();
-#endif
+  caf::init_global_meta_objects<caf::id_block::actor_creation>();
+  caf::core::init_global_meta_objects();
   s_num = static_cast<uint32_t>(std::stoi(argv[1]));
-  actor_system_config cfg;
-  actor_system system{cfg};
-  scoped_actor self{system};
-  anon_send(system.spawn<lazy_init>(testee, self), spread_atom_v, s_num);
+  caf::actor_system_config cfg;
+  caf::actor_system system{cfg};
+  caf::scoped_actor self{system};
+  caf::anon_mail(spread_atom_v, s_num)
+    .send(system.spawn<caf::lazy_init>(testee, self));
 }

@@ -18,7 +18,6 @@
  ******************************************************************************/
 
 #include <cassert>
-#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -27,26 +26,9 @@
 
 #include "caf/all.hpp"
 
-#if CAF_VERSION < 1800
-
-using msg1_atom = caf::atom_constant<caf::atom("msg1")>;
-using msg2_atom = caf::atom_constant<caf::atom("msg2")>;
-using msg3_atom = caf::atom_constant<caf::atom("msg3")>;
-using msg4_atom = caf::atom_constant<caf::atom("msg4")>;
-using msg5_atom = caf::atom_constant<caf::atom("msg5")>;
-using msg6_atom = caf::atom_constant<caf::atom("msg6")>;
-static constexpr msg1_atom msg1_atom_v = msg1_atom::value;
-static constexpr msg2_atom msg2_atom_v = msg2_atom::value;
-static constexpr msg3_atom msg3_atom_v = msg3_atom::value;
-static constexpr msg4_atom msg4_atom_v = msg4_atom::value;
-static constexpr msg5_atom msg5_atom_v = msg5_atom::value;
-static constexpr msg6_atom msg6_atom_v = msg6_atom::value;
-
-#else
-
 CAF_BEGIN_TYPE_ID_BLOCK(matching, first_custom_type_id)
 
-  CAF_ADD_TYPE_ID(matching, (std::list<int32_t>) );
+  CAF_ADD_TYPE_ID(matching, (std::list<int32_t>) )
 
   CAF_ADD_ATOM(matching, msg1_atom);
   CAF_ADD_ATOM(matching, msg2_atom);
@@ -56,8 +38,6 @@ CAF_BEGIN_TYPE_ID_BLOCK(matching, first_custom_type_id)
   CAF_ADD_ATOM(matching, msg6_atom);
 
 CAF_END_TYPE_ID_BLOCK(matching)
-
-#endif
 
 using std::cerr;
 using std::cout;
@@ -74,20 +54,18 @@ void usage() {
 
 enum impl_type { static_tuple, dynamic_tuple };
 
-optional<impl_type> implproj(const string& str) {
+std::optional<impl_type> implproj(const string& str) {
   if (str == "cow_tuple")
     return static_tuple;
   if (str == "object_array")
     return dynamic_tuple;
-  return none;
+  return std::nullopt;
 }
 
 int main(int argc, char** argv) {
   if (argc != 3)
     return EXIT_FAILURE;
-#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::matching>();
-#endif
   impl_type impl;
   if (auto impl_opt = implproj(argv[1])) {
     impl = *impl_opt;

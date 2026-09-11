@@ -24,21 +24,11 @@
 
 #include "caf/all.hpp"
 
-#if CAF_VERSION < 1800
-
-using msg_atom = caf::atom_constant<caf::atom("msg")>;
-
-static constexpr msg_atom msg_atom_v = msg_atom::value;
-
-#else
-
 CAF_BEGIN_TYPE_ID_BLOCK(mailbox_performance, first_custom_type_id)
 
   CAF_ADD_ATOM(mailbox_performance, msg_atom);
 
 CAF_END_TYPE_ID_BLOCK(mailbox_performance)
-
-#endif
 
 using namespace caf;
 
@@ -55,7 +45,7 @@ class receiver : public event_based_actor {
 
   behavior make_behavior() override {
     return {
-      [=](msg_atom) {
+      [=, this](msg_atom) {
         if (++value_ == max_)
           quit();
       }
@@ -71,7 +61,7 @@ class receiver : public event_based_actor {
 void sender(actor whom, uint64_t count) {
   auto msg = make_message(msg_atom_v);
   for (uint64_t i = 0; i < count; ++i)
-    anon_send(whom, msg);
+    anon_mail(msg).send(whom);
 }
 
 int usage() {
@@ -93,10 +83,8 @@ void run(int argc, char** argv, uint64_t num_sender, uint64_t num_msgs) {
 int main(int argc, char** argv) {
   if (argc != 3)
     return usage();
-#if CAF_VERSION >= 1800
   init_global_meta_objects<caf::id_block::mailbox_performance>();
   core::init_global_meta_objects();
-#endif
   run(argc, argv, static_cast<uint64_t>(std::stoll(argv[1])),
       static_cast<uint64_t>(std::stoll(argv[2])));
 }
